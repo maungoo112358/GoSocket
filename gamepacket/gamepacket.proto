@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package gamepacket;
+option go_package = "gosocket/gamepacket";
+
+message GamePacket {
+  uint32 seq = 1;
+  oneof payload {
+    HandshakeRequest handshakeRequest = 2;
+    HandshakeResponse handshakeResponse = 3;
+    LobbyJoinBroadcast lobbyJoinBroadcast = 4;
+    ChatMessage chatMessage = 5;
+    ClientPosition clientPosition = 6;
+  }
+}
+
+message HandshakeRequest {
+  string clientName = 1; // optional nickname from client
+}
+
+message HandshakeResponse {
+  string privateId = 1;
+  string publicId = 2;
+}
+
+message LobbyJoinBroadcast {
+  string publicId = 1;
+  string colorHex = 2;
+}
+
+message ChatMessage {
+  string message = 1;
+}
+
+message ClientPosition {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
