@@ -17,6 +17,7 @@ func main() {
 	defer conn.Close()
 
 	fmt.Println("UDP server listening on: ", addr)
+	go heartbeatWatcher()
 
 	buf := make([]byte, 1024)
 	for {
@@ -37,7 +38,8 @@ func main() {
 			continue
 		}
 
-		fmt.Printf("From %v → Seq: %d\n", remote, pkt.Seq)
+		dispatchPacket(conn, remote, &pkt)
+
 	}
 
 }

@@ -31,6 +31,7 @@ type GamePacket struct {
 	//	*GamePacket_LobbyJoinBroadcast
 	//	*GamePacket_ChatMessage
 	//	*GamePacket_ClientPosition
+	//	*GamePacket_Heartbeat
 	Payload       isGamePacket_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -125,6 +126,15 @@ func (x *GamePacket) GetClientPosition() *ClientPosition {
 	return nil
 }
 
+func (x *GamePacket) GetHeartbeat() *Heartbeat {
+	if x != nil {
+		if x, ok := x.Payload.(*GamePacket_Heartbeat); ok {
+			return x.Heartbeat
+		}
+	}
+	return nil
+}
+
 type isGamePacket_Payload interface {
 	isGamePacket_Payload()
 }
@@ -149,6 +159,10 @@ type GamePacket_ClientPosition struct {
 	ClientPosition *ClientPosition `protobuf:"bytes,6,opt,name=clientPosition,proto3,oneof"`
 }
 
+type GamePacket_Heartbeat struct {
+	Heartbeat *Heartbeat `protobuf:"bytes,7,opt,name=heartbeat,proto3,oneof"`
+}
+
 func (*GamePacket_HandshakeRequest) isGamePacket_Payload() {}
 
 func (*GamePacket_HandshakeResponse) isGamePacket_Payload() {}
@@ -158,6 +172,8 @@ func (*GamePacket_LobbyJoinBroadcast) isGamePacket_Payload() {}
 func (*GamePacket_ChatMessage) isGamePacket_Payload() {}
 
 func (*GamePacket_ClientPosition) isGamePacket_Payload() {}
+
+func (*GamePacket_Heartbeat) isGamePacket_Payload() {}
 
 type HandshakeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -307,62 +323,19 @@ func (x *LobbyJoinBroadcast) GetColorHex() string {
 	return ""
 }
 
-type ChatMessage struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ChatMessage) Reset() {
-	*x = ChatMessage{}
-	mi := &file_gamepacket_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ChatMessage) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ChatMessage) ProtoMessage() {}
-
-func (x *ChatMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_gamepacket_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ChatMessage.ProtoReflect.Descriptor instead.
-func (*ChatMessage) Descriptor() ([]byte, []int) {
-	return file_gamepacket_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *ChatMessage) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
 type ClientPosition struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	X             float32                `protobuf:"fixed32,1,opt,name=x,proto3" json:"x,omitempty"`
-	Y             float32                `protobuf:"fixed32,2,opt,name=y,proto3" json:"y,omitempty"`
-	Z             float32                `protobuf:"fixed32,3,opt,name=z,proto3" json:"z,omitempty"`
+	ClientId      string                 `protobuf:"bytes,1,opt,name=clientId,proto3" json:"clientId,omitempty"` // who sent this
+	X             float32                `protobuf:"fixed32,2,opt,name=x,proto3" json:"x,omitempty"`
+	Y             float32                `protobuf:"fixed32,3,opt,name=y,proto3" json:"y,omitempty"`
+	Z             float32                `protobuf:"fixed32,4,opt,name=z,proto3" json:"z,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ClientPosition) Reset() {
 	*x = ClientPosition{}
-	mi := &file_gamepacket_proto_msgTypes[5]
+	mi := &file_gamepacket_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -374,7 +347,7 @@ func (x *ClientPosition) String() string {
 func (*ClientPosition) ProtoMessage() {}
 
 func (x *ClientPosition) ProtoReflect() protoreflect.Message {
-	mi := &file_gamepacket_proto_msgTypes[5]
+	mi := &file_gamepacket_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -387,7 +360,14 @@ func (x *ClientPosition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClientPosition.ProtoReflect.Descriptor instead.
 func (*ClientPosition) Descriptor() ([]byte, []int) {
-	return file_gamepacket_proto_rawDescGZIP(), []int{5}
+	return file_gamepacket_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ClientPosition) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
 }
 
 func (x *ClientPosition) GetX() float32 {
@@ -411,12 +391,108 @@ func (x *ClientPosition) GetZ() float32 {
 	return 0
 }
 
+type ChatMessage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ClientId      string                 `protobuf:"bytes,1,opt,name=clientId,proto3" json:"clientId,omitempty"` // who said it
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatMessage) Reset() {
+	*x = ChatMessage{}
+	mi := &file_gamepacket_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatMessage) ProtoMessage() {}
+
+func (x *ChatMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_gamepacket_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatMessage.ProtoReflect.Descriptor instead.
+func (*ChatMessage) Descriptor() ([]byte, []int) {
+	return file_gamepacket_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ChatMessage) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *ChatMessage) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type Heartbeat struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ClientId      string                 `protobuf:"bytes,1,opt,name=clientId,proto3" json:"clientId,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Heartbeat) Reset() {
+	*x = Heartbeat{}
+	mi := &file_gamepacket_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Heartbeat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Heartbeat) ProtoMessage() {}
+
+func (x *Heartbeat) ProtoReflect() protoreflect.Message {
+	mi := &file_gamepacket_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Heartbeat.ProtoReflect.Descriptor instead.
+func (*Heartbeat) Descriptor() ([]byte, []int) {
+	return file_gamepacket_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *Heartbeat) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
 var File_gamepacket_proto protoreflect.FileDescriptor
 
 const file_gamepacket_proto_rawDesc = "" +
 	"\n" +
 	"\x10gamepacket.proto\x12\n" +
-	"gamepacket\"\x99\x03\n" +
+	"gamepacket\"\xd0\x03\n" +
 	"\n" +
 	"GamePacket\x12\x10\n" +
 	"\x03seq\x18\x01 \x01(\rR\x03seq\x12J\n" +
@@ -424,7 +500,8 @@ const file_gamepacket_proto_rawDesc = "" +
 	"\x11handshakeResponse\x18\x03 \x01(\v2\x1d.gamepacket.HandshakeResponseH\x00R\x11handshakeResponse\x12P\n" +
 	"\x12lobbyJoinBroadcast\x18\x04 \x01(\v2\x1e.gamepacket.LobbyJoinBroadcastH\x00R\x12lobbyJoinBroadcast\x12;\n" +
 	"\vchatMessage\x18\x05 \x01(\v2\x17.gamepacket.ChatMessageH\x00R\vchatMessage\x12D\n" +
-	"\x0eclientPosition\x18\x06 \x01(\v2\x1a.gamepacket.ClientPositionH\x00R\x0eclientPositionB\t\n" +
+	"\x0eclientPosition\x18\x06 \x01(\v2\x1a.gamepacket.ClientPositionH\x00R\x0eclientPosition\x125\n" +
+	"\theartbeat\x18\a \x01(\v2\x15.gamepacket.HeartbeatH\x00R\theartbeatB\t\n" +
 	"\apayload\"2\n" +
 	"\x10HandshakeRequest\x12\x1e\n" +
 	"\n" +
@@ -435,13 +512,17 @@ const file_gamepacket_proto_rawDesc = "" +
 	"\bpublicId\x18\x02 \x01(\tR\bpublicId\"L\n" +
 	"\x12LobbyJoinBroadcast\x12\x1a\n" +
 	"\bpublicId\x18\x01 \x01(\tR\bpublicId\x12\x1a\n" +
-	"\bcolorHex\x18\x02 \x01(\tR\bcolorHex\"'\n" +
-	"\vChatMessage\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\":\n" +
-	"\x0eClientPosition\x12\f\n" +
-	"\x01x\x18\x01 \x01(\x02R\x01x\x12\f\n" +
-	"\x01y\x18\x02 \x01(\x02R\x01y\x12\f\n" +
-	"\x01z\x18\x03 \x01(\x02R\x01zB\x15Z\x13gosocket/gamepacketb\x06proto3"
+	"\bcolorHex\x18\x02 \x01(\tR\bcolorHex\"V\n" +
+	"\x0eClientPosition\x12\x1a\n" +
+	"\bclientId\x18\x01 \x01(\tR\bclientId\x12\f\n" +
+	"\x01x\x18\x02 \x01(\x02R\x01x\x12\f\n" +
+	"\x01y\x18\x03 \x01(\x02R\x01y\x12\f\n" +
+	"\x01z\x18\x04 \x01(\x02R\x01z\"C\n" +
+	"\vChatMessage\x12\x1a\n" +
+	"\bclientId\x18\x01 \x01(\tR\bclientId\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"'\n" +
+	"\tHeartbeat\x12\x1a\n" +
+	"\bclientId\x18\x01 \x01(\tR\bclientIdB\x15Z\x13gosocket/gamepacketb\x06proto3"
 
 var (
 	file_gamepacket_proto_rawDescOnce sync.Once
@@ -455,26 +536,28 @@ func file_gamepacket_proto_rawDescGZIP() []byte {
 	return file_gamepacket_proto_rawDescData
 }
 
-var file_gamepacket_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_gamepacket_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_gamepacket_proto_goTypes = []any{
 	(*GamePacket)(nil),         // 0: gamepacket.GamePacket
 	(*HandshakeRequest)(nil),   // 1: gamepacket.HandshakeRequest
 	(*HandshakeResponse)(nil),  // 2: gamepacket.HandshakeResponse
 	(*LobbyJoinBroadcast)(nil), // 3: gamepacket.LobbyJoinBroadcast
-	(*ChatMessage)(nil),        // 4: gamepacket.ChatMessage
-	(*ClientPosition)(nil),     // 5: gamepacket.ClientPosition
+	(*ClientPosition)(nil),     // 4: gamepacket.ClientPosition
+	(*ChatMessage)(nil),        // 5: gamepacket.ChatMessage
+	(*Heartbeat)(nil),          // 6: gamepacket.Heartbeat
 }
 var file_gamepacket_proto_depIdxs = []int32{
 	1, // 0: gamepacket.GamePacket.handshakeRequest:type_name -> gamepacket.HandshakeRequest
 	2, // 1: gamepacket.GamePacket.handshakeResponse:type_name -> gamepacket.HandshakeResponse
 	3, // 2: gamepacket.GamePacket.lobbyJoinBroadcast:type_name -> gamepacket.LobbyJoinBroadcast
-	4, // 3: gamepacket.GamePacket.chatMessage:type_name -> gamepacket.ChatMessage
-	5, // 4: gamepacket.GamePacket.clientPosition:type_name -> gamepacket.ClientPosition
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	5, // 3: gamepacket.GamePacket.chatMessage:type_name -> gamepacket.ChatMessage
+	4, // 4: gamepacket.GamePacket.clientPosition:type_name -> gamepacket.ClientPosition
+	6, // 5: gamepacket.GamePacket.heartbeat:type_name -> gamepacket.Heartbeat
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_gamepacket_proto_init() }
@@ -488,6 +571,7 @@ func file_gamepacket_proto_init() {
 		(*GamePacket_LobbyJoinBroadcast)(nil),
 		(*GamePacket_ChatMessage)(nil),
 		(*GamePacket_ClientPosition)(nil),
+		(*GamePacket_Heartbeat)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -495,7 +579,7 @@ func file_gamepacket_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gamepacket_proto_rawDesc), len(file_gamepacket_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
