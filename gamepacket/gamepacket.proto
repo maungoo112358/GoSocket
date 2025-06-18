@@ -9,8 +9,9 @@ message GamePacket {
   HandshakeResponse handshake_response = 3;
   Heartbeat heartbeat = 4;
   HeartbeatAck heartbeat_ack = 5;
-  ChatMessage chat_message = 6;
-  LobbyJoinBroadcast lobby_join_broadcast = 7;
+  ClientPosition ClientPosition = 6;
+  ChatMessage chat_message = 7;
+  LobbyJoinBroadcast lobby_join_broadcast = 8;
   ServerStatus server_status = 99;
 }
 

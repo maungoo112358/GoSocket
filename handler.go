@@ -4,18 +4,11 @@ import (
 	"fmt"
 	"gosocket/gamepacket"
 	"net"
-	"sync"
-	"time"
 
 	"google.golang.org/protobuf/proto"
 )
 
 type PacketHandler func(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket)
-
-var (
-	clientMap   = make(map[string]string)
-	clientMutex sync.Mutex
-)
 
 func dispatchPacket(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) {
 	switch {
@@ -26,20 +19,23 @@ func dispatchPacket(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePack
 	case pkt.GetLobbyJoinBroadcast() != nil:
 		handleLobbyJoin(conn, addr, pkt)
 	case pkt.GetChatMessage() != nil:
-		handleChat(conn, addr, pkt)
+		handleChatMessage(conn, addr, pkt)
 	default:
 		fmt.Println("⚠️ Unhandled packet type")
 	}
 }
 
 func handleHandshake(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) {
-	handshake := pkt.GetHandshakeRequest()
-	if handshake == nil {
-		fmt.Println("⚠️ Invalid handshake packet")
+	req := pkt.GetHandshakeRequest()
+	if req == nil {
 		return
 	}
+
 	privateID := generatePrivateID()
 	publicID := generatePublicID()
+
+	// Add to consolidated client map
+	addClient(privateID, publicID, req.ClientName, addr)
 
 	response := &gamepacket.GamePacket{
 		Seq: pkt.Seq,
@@ -49,23 +45,9 @@ func handleHandshake(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePac
 		},
 	}
 
-	data, err := proto.Marshal(response)
-	if err == nil {
+	if data, err := proto.Marshal(response); err == nil {
 		conn.WriteTo(data, addr)
 	}
-	clientsMu.Lock()
-	clients[privateID] = &Client{
-		PrivateID: privateID,
-		PublicID:  publicID,
-		Addr:      addr,
-		LastSeen:  time.Now(),
-	}
-	clientsMu.Unlock()
-
-	clientMutex.Lock()
-	clientMap[privateID] = publicID
-	clientMutex.Unlock()
-	fmt.Printf("🟢 New Client connected from %s\n Private ID %s\n Public ID %s\n", addr.String(), privateID, publicID)
 }
 
 func handleHeartbeat(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) {
@@ -73,43 +55,81 @@ func handleHeartbeat(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePac
 	if heartbeat == nil {
 		return
 	}
-	updateHeartbeat(heartbeat.ClientId)
+
+	// Update heartbeat timestamp
+	if !updateHeartbeat(heartbeat.ClientId) {
+		fmt.Printf("⚠️ Invalid heartbeat from unknown client: %s\n", heartbeat.ClientId)
+		return
+	}
+
+	// Send heartbeat acknowledgment
+	response := &gamepacket.GamePacket{
+		Seq: pkt.Seq,
+		HeartbeatAck: &gamepacket.HeartbeatAck{
+			ClientId: heartbeat.ClientId,
+		},
+	}
+
+	if data, err := proto.Marshal(response); err == nil {
+		conn.WriteTo(data, addr)
+	}
 }
 
 func handleLobbyJoin(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) {
-	join := pkt.GetLobbyJoinBroadcast()
-	if join == nil {
+	lobby := pkt.GetLobbyJoinBroadcast()
+	if lobby == nil {
 		return
 	}
-	fmt.Printf("🏠 %s joined the lobby with color  %s\n", join.PublicId, join.ColorHex)
+
+	allClientsMu.Lock()
+	var senderPrivateID string
+	for privateID, client := range allClients {
+		if client.PublicID == lobby.PublicId {
+			client.ColorHex = lobby.ColorHex
+			senderPrivateID = privateID
+			break
+		}
+	}
+	allClientsMu.Unlock()
+	if senderPrivateID == "" {
+		fmt.Printf("⚠️ Lobby join from unknown client:  %s\n", lobby.PublicId)
+		return
+	}
+
+	fmt.Printf("🎨 %s joined lobby with color %s\n", lobby.PublicId, lobby.ColorHex)
+
+	broadcastToAll(conn, pkt, senderPrivateID)
 }
 
-func handleDisconnection(privateID string) {
-	clientsMu.Lock()
-	delete(clients, privateID)
-	clientsMu.Unlock()
-
-	clientMutex.Lock()
-	publicID, exists := clientMap[privateID]
-	if exists {
-		fmt.Printf("🔴 Client disconnected %s (%s)\n", publicID, privateID)
-		delete(clientMap, privateID)
+func handleChatMessage(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) {
+	chat := pkt.GetChatMessage()
+	if chat == nil {
+		return
 	}
-	clientMutex.Unlock()
-}
 
-func handleChat(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) {
-	msg := pkt.GetChatMessage()
-	if msg != nil {
-		fmt.Printf("💬 %s says: %s\n", msg.ClientId, msg.Message)
+	senderExists := false
+	allClientsMu.RLock()
+	for _, client := range allClients {
+		if client.PublicID == chat.ClientId {
+			senderExists = true
+			break
+		}
 	}
+
+	allClientsMu.RUnlock()
+
+	if !senderExists {
+		fmt.Printf("⚠️ Chat from unknown client %s\n", chat.ClientId)
+	}
+
+	fmt.Printf("💬 %s says: %s\n", chat.ClientId, chat.Message)
 }
 
 func notifyClientsBeforeShutdown(conn net.PacketConn) {
-	clientsMu.Lock()
-	defer clientsMu.Unlock()
+	allClientsMu.Lock()
+	defer allClientsMu.Unlock()
 
-	for _, client := range clients {
+	for _, client := range allClients {
 		response := &gamepacket.GamePacket{
 			Seq: 999,
 			ServerStatus: &gamepacket.ServerStatus{
@@ -118,6 +138,6 @@ func notifyClientsBeforeShutdown(conn net.PacketConn) {
 		}
 
 		data, _ := proto.Marshal(response)
-		conn.WriteTo(data, client.Addr)
+		conn.WriteTo(data, client.Address)
 	}
 }

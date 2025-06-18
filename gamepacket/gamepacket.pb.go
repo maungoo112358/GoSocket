@@ -28,8 +28,9 @@ type GamePacket struct {
 	HandshakeResponse  *HandshakeResponse     `protobuf:"bytes,3,opt,name=handshake_response,json=handshakeResponse,proto3" json:"handshake_response,omitempty"`
 	Heartbeat          *Heartbeat             `protobuf:"bytes,4,opt,name=heartbeat,proto3" json:"heartbeat,omitempty"`
 	HeartbeatAck       *HeartbeatAck          `protobuf:"bytes,5,opt,name=heartbeat_ack,json=heartbeatAck,proto3" json:"heartbeat_ack,omitempty"`
-	ChatMessage        *ChatMessage           `protobuf:"bytes,6,opt,name=chat_message,json=chatMessage,proto3" json:"chat_message,omitempty"`
-	LobbyJoinBroadcast *LobbyJoinBroadcast    `protobuf:"bytes,7,opt,name=lobby_join_broadcast,json=lobbyJoinBroadcast,proto3" json:"lobby_join_broadcast,omitempty"`
+	ClientPosition     *ClientPosition        `protobuf:"bytes,6,opt,name=ClientPosition,proto3" json:"ClientPosition,omitempty"`
+	ChatMessage        *ChatMessage           `protobuf:"bytes,7,opt,name=chat_message,json=chatMessage,proto3" json:"chat_message,omitempty"`
+	LobbyJoinBroadcast *LobbyJoinBroadcast    `protobuf:"bytes,8,opt,name=lobby_join_broadcast,json=lobbyJoinBroadcast,proto3" json:"lobby_join_broadcast,omitempty"`
 	ServerStatus       *ServerStatus          `protobuf:"bytes,99,opt,name=server_status,json=serverStatus,proto3" json:"server_status,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
@@ -96,6 +97,13 @@ func (x *GamePacket) GetHeartbeat() *Heartbeat {
 func (x *GamePacket) GetHeartbeatAck() *HeartbeatAck {
 	if x != nil {
 		return x.HeartbeatAck
+	}
+	return nil
+}
+
+func (x *GamePacket) GetClientPosition() *ClientPosition {
+	if x != nil {
+		return x.ClientPosition
 	}
 	return nil
 }
@@ -526,16 +534,17 @@ var File_gamepacket_proto protoreflect.FileDescriptor
 const file_gamepacket_proto_rawDesc = "" +
 	"\n" +
 	"\x10gamepacket.proto\x12\n" +
-	"gamepacket\"\xf8\x03\n" +
+	"gamepacket\"\xbc\x04\n" +
 	"\n" +
 	"GamePacket\x12\x10\n" +
 	"\x03seq\x18\x01 \x01(\rR\x03seq\x12I\n" +
 	"\x11handshake_request\x18\x02 \x01(\v2\x1c.gamepacket.HandshakeRequestR\x10handshakeRequest\x12L\n" +
 	"\x12handshake_response\x18\x03 \x01(\v2\x1d.gamepacket.HandshakeResponseR\x11handshakeResponse\x123\n" +
 	"\theartbeat\x18\x04 \x01(\v2\x15.gamepacket.HeartbeatR\theartbeat\x12=\n" +
-	"\rheartbeat_ack\x18\x05 \x01(\v2\x18.gamepacket.HeartbeatAckR\fheartbeatAck\x12:\n" +
-	"\fchat_message\x18\x06 \x01(\v2\x17.gamepacket.ChatMessageR\vchatMessage\x12P\n" +
-	"\x14lobby_join_broadcast\x18\a \x01(\v2\x1e.gamepacket.LobbyJoinBroadcastR\x12lobbyJoinBroadcast\x12=\n" +
+	"\rheartbeat_ack\x18\x05 \x01(\v2\x18.gamepacket.HeartbeatAckR\fheartbeatAck\x12B\n" +
+	"\x0eClientPosition\x18\x06 \x01(\v2\x1a.gamepacket.ClientPositionR\x0eClientPosition\x12:\n" +
+	"\fchat_message\x18\a \x01(\v2\x17.gamepacket.ChatMessageR\vchatMessage\x12P\n" +
+	"\x14lobby_join_broadcast\x18\b \x01(\v2\x1e.gamepacket.LobbyJoinBroadcastR\x12lobbyJoinBroadcast\x12=\n" +
 	"\rserver_status\x18c \x01(\v2\x18.gamepacket.ServerStatusR\fserverStatus\"2\n" +
 	"\x10HandshakeRequest\x12\x1e\n" +
 	"\n" +
@@ -591,14 +600,15 @@ var file_gamepacket_proto_depIdxs = []int32{
 	2, // 1: gamepacket.GamePacket.handshake_response:type_name -> gamepacket.HandshakeResponse
 	6, // 2: gamepacket.GamePacket.heartbeat:type_name -> gamepacket.Heartbeat
 	7, // 3: gamepacket.GamePacket.heartbeat_ack:type_name -> gamepacket.HeartbeatAck
-	5, // 4: gamepacket.GamePacket.chat_message:type_name -> gamepacket.ChatMessage
-	3, // 5: gamepacket.GamePacket.lobby_join_broadcast:type_name -> gamepacket.LobbyJoinBroadcast
-	8, // 6: gamepacket.GamePacket.server_status:type_name -> gamepacket.ServerStatus
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	4, // 4: gamepacket.GamePacket.ClientPosition:type_name -> gamepacket.ClientPosition
+	5, // 5: gamepacket.GamePacket.chat_message:type_name -> gamepacket.ChatMessage
+	3, // 6: gamepacket.GamePacket.lobby_join_broadcast:type_name -> gamepacket.LobbyJoinBroadcast
+	8, // 7: gamepacket.GamePacket.server_status:type_name -> gamepacket.ServerStatus
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_gamepacket_proto_init() }

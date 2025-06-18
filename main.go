@@ -20,7 +20,7 @@ func main() {
 	defer conn.Close()
 
 	fmt.Println("✅ UDP server listening on: ", addr)
-	go heartbeatWatcher()
+	go startHeartbeatChecker()
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
