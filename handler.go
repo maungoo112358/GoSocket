@@ -12,28 +12,21 @@ import (
 
 type PacketHandler func(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket)
 
-var packetHandlers = map[string]func(net.PacketConn, net.Addr, *gamepacket.GamePacket){
-	"handshake":  handleHandshake,
-	"heartbeat":  handleHeartbeat,
-	"chat":       handleChat,
-	"lobby_join": handleLobbyJoin,
-}
-
 var (
 	clientMap   = make(map[string]string)
 	clientMutex sync.Mutex
 )
 
 func dispatchPacket(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) {
-	switch pkt.Payload.(type) {
-	case *gamepacket.GamePacket_HandshakeRequest:
-		packetHandlers["handshake"](conn, addr, pkt)
-	case *gamepacket.GamePacket_Heartbeat:
-		packetHandlers["heartbeat"](conn, addr, pkt)
-	case *gamepacket.GamePacket_LobbyJoinBroadcast:
-		packetHandlers["lobby_join"](conn, addr, pkt)
-	case *gamepacket.GamePacket_ChatMessage:
-		packetHandlers["chat"](conn, addr, pkt)
+	switch {
+	case pkt.GetHandshakeRequest() != nil:
+		handleHandshake(conn, addr, pkt)
+	case pkt.GetHeartbeat() != nil:
+		handleHeartbeat(conn, addr, pkt)
+	case pkt.GetLobbyJoinBroadcast() != nil:
+		handleLobbyJoin(conn, addr, pkt)
+	case pkt.GetChatMessage() != nil:
+		handleChat(conn, addr, pkt)
 	default:
 		fmt.Println("⚠️ Unhandled packet type")
 	}
@@ -42,7 +35,7 @@ func dispatchPacket(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePack
 func handleHandshake(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) {
 	handshake := pkt.GetHandshakeRequest()
 	if handshake == nil {
-		fmt.Println("Invalid handshake packet")
+		fmt.Println("⚠️ Invalid handshake packet")
 		return
 	}
 	privateID := generatePrivateID()
@@ -50,11 +43,9 @@ func handleHandshake(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePac
 
 	response := &gamepacket.GamePacket{
 		Seq: pkt.Seq,
-		Payload: &gamepacket.GamePacket_HandshakeResponse{
-			HandshakeResponse: &gamepacket.HandshakeResponse{
-				PrivateId: privateID,
-				PublicId:  publicID,
-			},
+		HandshakeResponse: &gamepacket.HandshakeResponse{
+			PrivateId: privateID,
+			PublicId:  publicID,
 		},
 	}
 
@@ -111,5 +102,22 @@ func handleChat(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) 
 	msg := pkt.GetChatMessage()
 	if msg != nil {
 		fmt.Printf("💬 %s says: %s\n", msg.ClientId, msg.Message)
+	}
+}
+
+func notifyClientsBeforeShutdown(conn net.PacketConn) {
+	clientsMu.Lock()
+	defer clientsMu.Unlock()
+
+	for _, client := range clients {
+		response := &gamepacket.GamePacket{
+			Seq: 999,
+			ServerStatus: &gamepacket.ServerStatus{
+				Message: "Server is shutting down",
+			},
+		}
+
+		data, _ := proto.Marshal(response)
+		conn.WriteTo(data, client.Addr)
 	}
 }

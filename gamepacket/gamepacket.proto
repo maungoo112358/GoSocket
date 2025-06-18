@@ -5,16 +5,14 @@ option go_package = "gosocket/gamepacket";
 
 message GamePacket {
   uint32 seq = 1;
-  oneof payload {
-    HandshakeRequest handshakeRequest = 2;
-    HandshakeResponse handshakeResponse = 3;
-    LobbyJoinBroadcast lobbyJoinBroadcast = 4;
-    ChatMessage chatMessage = 5;
-    ClientPosition clientPosition = 6;
-    Heartbeat heartbeat = 7;
-  }
+  HandshakeRequest handshake_request = 2;
+  HandshakeResponse handshake_response = 3;
+  Heartbeat heartbeat = 4;
+  HeartbeatAck heartbeat_ack = 5;
+  ChatMessage chat_message = 6;
+  LobbyJoinBroadcast lobby_join_broadcast = 7;
+  ServerStatus server_status = 99;
 }
-
 
 message HandshakeRequest {
   string clientName = 1; // optional nickname from client
@@ -46,3 +44,10 @@ message Heartbeat {
   string clientId = 1;
 }
 
+message HeartbeatAck {
+    string client_id = 1;
+}
+
+message ServerStatus {
+  string message = 1;
+}

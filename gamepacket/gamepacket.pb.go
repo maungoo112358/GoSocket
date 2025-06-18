@@ -22,19 +22,17 @@ const (
 )
 
 type GamePacket struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Seq   uint32                 `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
-	// Types that are valid to be assigned to Payload:
-	//
-	//	*GamePacket_HandshakeRequest
-	//	*GamePacket_HandshakeResponse
-	//	*GamePacket_LobbyJoinBroadcast
-	//	*GamePacket_ChatMessage
-	//	*GamePacket_ClientPosition
-	//	*GamePacket_Heartbeat
-	Payload       isGamePacket_Payload `protobuf_oneof:"payload"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Seq                uint32                 `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
+	HandshakeRequest   *HandshakeRequest      `protobuf:"bytes,2,opt,name=handshake_request,json=handshakeRequest,proto3" json:"handshake_request,omitempty"`
+	HandshakeResponse  *HandshakeResponse     `protobuf:"bytes,3,opt,name=handshake_response,json=handshakeResponse,proto3" json:"handshake_response,omitempty"`
+	Heartbeat          *Heartbeat             `protobuf:"bytes,4,opt,name=heartbeat,proto3" json:"heartbeat,omitempty"`
+	HeartbeatAck       *HeartbeatAck          `protobuf:"bytes,5,opt,name=heartbeat_ack,json=heartbeatAck,proto3" json:"heartbeat_ack,omitempty"`
+	ChatMessage        *ChatMessage           `protobuf:"bytes,6,opt,name=chat_message,json=chatMessage,proto3" json:"chat_message,omitempty"`
+	LobbyJoinBroadcast *LobbyJoinBroadcast    `protobuf:"bytes,7,opt,name=lobby_join_broadcast,json=lobbyJoinBroadcast,proto3" json:"lobby_join_broadcast,omitempty"`
+	ServerStatus       *ServerStatus          `protobuf:"bytes,99,opt,name=server_status,json=serverStatus,proto3" json:"server_status,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *GamePacket) Reset() {
@@ -74,106 +72,54 @@ func (x *GamePacket) GetSeq() uint32 {
 	return 0
 }
 
-func (x *GamePacket) GetPayload() isGamePacket_Payload {
-	if x != nil {
-		return x.Payload
-	}
-	return nil
-}
-
 func (x *GamePacket) GetHandshakeRequest() *HandshakeRequest {
 	if x != nil {
-		if x, ok := x.Payload.(*GamePacket_HandshakeRequest); ok {
-			return x.HandshakeRequest
-		}
+		return x.HandshakeRequest
 	}
 	return nil
 }
 
 func (x *GamePacket) GetHandshakeResponse() *HandshakeResponse {
 	if x != nil {
-		if x, ok := x.Payload.(*GamePacket_HandshakeResponse); ok {
-			return x.HandshakeResponse
-		}
-	}
-	return nil
-}
-
-func (x *GamePacket) GetLobbyJoinBroadcast() *LobbyJoinBroadcast {
-	if x != nil {
-		if x, ok := x.Payload.(*GamePacket_LobbyJoinBroadcast); ok {
-			return x.LobbyJoinBroadcast
-		}
-	}
-	return nil
-}
-
-func (x *GamePacket) GetChatMessage() *ChatMessage {
-	if x != nil {
-		if x, ok := x.Payload.(*GamePacket_ChatMessage); ok {
-			return x.ChatMessage
-		}
-	}
-	return nil
-}
-
-func (x *GamePacket) GetClientPosition() *ClientPosition {
-	if x != nil {
-		if x, ok := x.Payload.(*GamePacket_ClientPosition); ok {
-			return x.ClientPosition
-		}
+		return x.HandshakeResponse
 	}
 	return nil
 }
 
 func (x *GamePacket) GetHeartbeat() *Heartbeat {
 	if x != nil {
-		if x, ok := x.Payload.(*GamePacket_Heartbeat); ok {
-			return x.Heartbeat
-		}
+		return x.Heartbeat
 	}
 	return nil
 }
 
-type isGamePacket_Payload interface {
-	isGamePacket_Payload()
+func (x *GamePacket) GetHeartbeatAck() *HeartbeatAck {
+	if x != nil {
+		return x.HeartbeatAck
+	}
+	return nil
 }
 
-type GamePacket_HandshakeRequest struct {
-	HandshakeRequest *HandshakeRequest `protobuf:"bytes,2,opt,name=handshakeRequest,proto3,oneof"`
+func (x *GamePacket) GetChatMessage() *ChatMessage {
+	if x != nil {
+		return x.ChatMessage
+	}
+	return nil
 }
 
-type GamePacket_HandshakeResponse struct {
-	HandshakeResponse *HandshakeResponse `protobuf:"bytes,3,opt,name=handshakeResponse,proto3,oneof"`
+func (x *GamePacket) GetLobbyJoinBroadcast() *LobbyJoinBroadcast {
+	if x != nil {
+		return x.LobbyJoinBroadcast
+	}
+	return nil
 }
 
-type GamePacket_LobbyJoinBroadcast struct {
-	LobbyJoinBroadcast *LobbyJoinBroadcast `protobuf:"bytes,4,opt,name=lobbyJoinBroadcast,proto3,oneof"`
+func (x *GamePacket) GetServerStatus() *ServerStatus {
+	if x != nil {
+		return x.ServerStatus
+	}
+	return nil
 }
-
-type GamePacket_ChatMessage struct {
-	ChatMessage *ChatMessage `protobuf:"bytes,5,opt,name=chatMessage,proto3,oneof"`
-}
-
-type GamePacket_ClientPosition struct {
-	ClientPosition *ClientPosition `protobuf:"bytes,6,opt,name=clientPosition,proto3,oneof"`
-}
-
-type GamePacket_Heartbeat struct {
-	Heartbeat *Heartbeat `protobuf:"bytes,7,opt,name=heartbeat,proto3,oneof"`
-}
-
-func (*GamePacket_HandshakeRequest) isGamePacket_Payload() {}
-
-func (*GamePacket_HandshakeResponse) isGamePacket_Payload() {}
-
-func (*GamePacket_LobbyJoinBroadcast) isGamePacket_Payload() {}
-
-func (*GamePacket_ChatMessage) isGamePacket_Payload() {}
-
-func (*GamePacket_ClientPosition) isGamePacket_Payload() {}
-
-func (*GamePacket_Heartbeat) isGamePacket_Payload() {}
 
 type HandshakeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -487,22 +433,110 @@ func (x *Heartbeat) GetClientId() string {
 	return ""
 }
 
+type HeartbeatAck struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ClientId      string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HeartbeatAck) Reset() {
+	*x = HeartbeatAck{}
+	mi := &file_gamepacket_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HeartbeatAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HeartbeatAck) ProtoMessage() {}
+
+func (x *HeartbeatAck) ProtoReflect() protoreflect.Message {
+	mi := &file_gamepacket_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HeartbeatAck.ProtoReflect.Descriptor instead.
+func (*HeartbeatAck) Descriptor() ([]byte, []int) {
+	return file_gamepacket_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *HeartbeatAck) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+type ServerStatus struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ServerStatus) Reset() {
+	*x = ServerStatus{}
+	mi := &file_gamepacket_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ServerStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ServerStatus) ProtoMessage() {}
+
+func (x *ServerStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_gamepacket_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ServerStatus.ProtoReflect.Descriptor instead.
+func (*ServerStatus) Descriptor() ([]byte, []int) {
+	return file_gamepacket_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ServerStatus) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_gamepacket_proto protoreflect.FileDescriptor
 
 const file_gamepacket_proto_rawDesc = "" +
 	"\n" +
 	"\x10gamepacket.proto\x12\n" +
-	"gamepacket\"\xd0\x03\n" +
+	"gamepacket\"\xf8\x03\n" +
 	"\n" +
 	"GamePacket\x12\x10\n" +
-	"\x03seq\x18\x01 \x01(\rR\x03seq\x12J\n" +
-	"\x10handshakeRequest\x18\x02 \x01(\v2\x1c.gamepacket.HandshakeRequestH\x00R\x10handshakeRequest\x12M\n" +
-	"\x11handshakeResponse\x18\x03 \x01(\v2\x1d.gamepacket.HandshakeResponseH\x00R\x11handshakeResponse\x12P\n" +
-	"\x12lobbyJoinBroadcast\x18\x04 \x01(\v2\x1e.gamepacket.LobbyJoinBroadcastH\x00R\x12lobbyJoinBroadcast\x12;\n" +
-	"\vchatMessage\x18\x05 \x01(\v2\x17.gamepacket.ChatMessageH\x00R\vchatMessage\x12D\n" +
-	"\x0eclientPosition\x18\x06 \x01(\v2\x1a.gamepacket.ClientPositionH\x00R\x0eclientPosition\x125\n" +
-	"\theartbeat\x18\a \x01(\v2\x15.gamepacket.HeartbeatH\x00R\theartbeatB\t\n" +
-	"\apayload\"2\n" +
+	"\x03seq\x18\x01 \x01(\rR\x03seq\x12I\n" +
+	"\x11handshake_request\x18\x02 \x01(\v2\x1c.gamepacket.HandshakeRequestR\x10handshakeRequest\x12L\n" +
+	"\x12handshake_response\x18\x03 \x01(\v2\x1d.gamepacket.HandshakeResponseR\x11handshakeResponse\x123\n" +
+	"\theartbeat\x18\x04 \x01(\v2\x15.gamepacket.HeartbeatR\theartbeat\x12=\n" +
+	"\rheartbeat_ack\x18\x05 \x01(\v2\x18.gamepacket.HeartbeatAckR\fheartbeatAck\x12:\n" +
+	"\fchat_message\x18\x06 \x01(\v2\x17.gamepacket.ChatMessageR\vchatMessage\x12P\n" +
+	"\x14lobby_join_broadcast\x18\a \x01(\v2\x1e.gamepacket.LobbyJoinBroadcastR\x12lobbyJoinBroadcast\x12=\n" +
+	"\rserver_status\x18c \x01(\v2\x18.gamepacket.ServerStatusR\fserverStatus\"2\n" +
 	"\x10HandshakeRequest\x12\x1e\n" +
 	"\n" +
 	"clientName\x18\x01 \x01(\tR\n" +
@@ -522,7 +556,11 @@ const file_gamepacket_proto_rawDesc = "" +
 	"\bclientId\x18\x01 \x01(\tR\bclientId\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"'\n" +
 	"\tHeartbeat\x12\x1a\n" +
-	"\bclientId\x18\x01 \x01(\tR\bclientIdB\x15Z\x13gosocket/gamepacketb\x06proto3"
+	"\bclientId\x18\x01 \x01(\tR\bclientId\"+\n" +
+	"\fHeartbeatAck\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\"(\n" +
+	"\fServerStatus\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessageB\x15Z\x13gosocket/gamepacketb\x06proto3"
 
 var (
 	file_gamepacket_proto_rawDescOnce sync.Once
@@ -536,7 +574,7 @@ func file_gamepacket_proto_rawDescGZIP() []byte {
 	return file_gamepacket_proto_rawDescData
 }
 
-var file_gamepacket_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_gamepacket_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_gamepacket_proto_goTypes = []any{
 	(*GamePacket)(nil),         // 0: gamepacket.GamePacket
 	(*HandshakeRequest)(nil),   // 1: gamepacket.HandshakeRequest
@@ -545,19 +583,22 @@ var file_gamepacket_proto_goTypes = []any{
 	(*ClientPosition)(nil),     // 4: gamepacket.ClientPosition
 	(*ChatMessage)(nil),        // 5: gamepacket.ChatMessage
 	(*Heartbeat)(nil),          // 6: gamepacket.Heartbeat
+	(*HeartbeatAck)(nil),       // 7: gamepacket.HeartbeatAck
+	(*ServerStatus)(nil),       // 8: gamepacket.ServerStatus
 }
 var file_gamepacket_proto_depIdxs = []int32{
-	1, // 0: gamepacket.GamePacket.handshakeRequest:type_name -> gamepacket.HandshakeRequest
-	2, // 1: gamepacket.GamePacket.handshakeResponse:type_name -> gamepacket.HandshakeResponse
-	3, // 2: gamepacket.GamePacket.lobbyJoinBroadcast:type_name -> gamepacket.LobbyJoinBroadcast
-	5, // 3: gamepacket.GamePacket.chatMessage:type_name -> gamepacket.ChatMessage
-	4, // 4: gamepacket.GamePacket.clientPosition:type_name -> gamepacket.ClientPosition
-	6, // 5: gamepacket.GamePacket.heartbeat:type_name -> gamepacket.Heartbeat
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	1, // 0: gamepacket.GamePacket.handshake_request:type_name -> gamepacket.HandshakeRequest
+	2, // 1: gamepacket.GamePacket.handshake_response:type_name -> gamepacket.HandshakeResponse
+	6, // 2: gamepacket.GamePacket.heartbeat:type_name -> gamepacket.Heartbeat
+	7, // 3: gamepacket.GamePacket.heartbeat_ack:type_name -> gamepacket.HeartbeatAck
+	5, // 4: gamepacket.GamePacket.chat_message:type_name -> gamepacket.ChatMessage
+	3, // 5: gamepacket.GamePacket.lobby_join_broadcast:type_name -> gamepacket.LobbyJoinBroadcast
+	8, // 6: gamepacket.GamePacket.server_status:type_name -> gamepacket.ServerStatus
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_gamepacket_proto_init() }
@@ -565,21 +606,13 @@ func file_gamepacket_proto_init() {
 	if File_gamepacket_proto != nil {
 		return
 	}
-	file_gamepacket_proto_msgTypes[0].OneofWrappers = []any{
-		(*GamePacket_HandshakeRequest)(nil),
-		(*GamePacket_HandshakeResponse)(nil),
-		(*GamePacket_LobbyJoinBroadcast)(nil),
-		(*GamePacket_ChatMessage)(nil),
-		(*GamePacket_ClientPosition)(nil),
-		(*GamePacket_Heartbeat)(nil),
-	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gamepacket_proto_rawDesc), len(file_gamepacket_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
