@@ -14,6 +14,11 @@ var (
 	idMutex        sync.Mutex
 )
 
+var (
+	publicIDCounter int
+	publicIDMutex   sync.Mutex
+)
+
 func generateSecureDigits(n int) string {
 	b := make([]byte, n)
 	crand.Read(b)
@@ -41,9 +46,23 @@ func generateUniqueID(prefix string, store map[string]struct{}) string {
 }
 
 func generatePublicID() string {
-	return generateUniqueID("p_", publicIDStore)
+	publicIDMutex.Lock()
+	publicIDCounter++
+	id := fmt.Sprintf("Client_%d", publicIDCounter)
+	publicIDStore[strings.ToLower(id)] = struct{}{}
+	publicIDMutex.Unlock()
+	return id
 }
 
 func generatePrivateID() string {
 	return generateUniqueID("Client_", privateIDStore)
+}
+
+// Clean up client IDs from maps
+func cleanupClientIDs(privateID, publicID string) {
+	idMutex.Lock()
+	defer idMutex.Unlock()
+
+	delete(privateIDStore, strings.ToLower(privateID))
+	delete(publicIDStore, strings.ToLower(publicID))
 }

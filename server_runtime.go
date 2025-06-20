@@ -19,7 +19,7 @@ func startServer(port string) {
 	defer conn.Close()
 
 	fmt.Println("✅ UDP server listening on: ", port)
-	go startHeartbeatChecker()
+	go startHeartbeatChecker(conn)
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)

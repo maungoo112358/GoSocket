@@ -4,15 +4,16 @@ package gamepacket;
 option go_package = "gosocket/gamepacket";
 
 message GamePacket {
-  uint32 seq = 1;
-  HandshakeRequest handshake_request = 2;
-  HandshakeResponse handshake_response = 3;
-  Heartbeat heartbeat = 4;
-  HeartbeatAck heartbeat_ack = 5;
+  uint32 Seq = 1;
+  HandshakeRequest HandshakeRequest = 2;
+  HandshakeResponse HandshakeResponse = 3;
+  Heartbeat Heartbeat = 4;
+  HeartbeatAck HeartbeatAck = 5;
   ClientPosition ClientPosition = 6;
-  ChatMessage chat_message = 7;
-  LobbyJoinBroadcast lobby_join_broadcast = 8;
-  ServerStatus server_status = 99;
+  ChatMessage ChatMessage = 7;
+  LobbyJoinBroadcast LobbyJoinBroadcast = 8;
+  ClientLobbyPosition ClientLobbyPosition = 9;
+  ServerStatus ServerStatus = 99;
 }
 
 message HandshakeRequest {
@@ -25,8 +26,10 @@ message HandshakeResponse {
 }
 
 message LobbyJoinBroadcast {
-  string publicId = 1;
-  string colorHex = 2;
+    string publicId = 1;
+    string colorhex = 2;
+    ClientLobbyPosition position = 3;  // New field
+    string colorhex_head= 4;
 }
 
 message ClientPosition {
@@ -34,6 +37,12 @@ message ClientPosition {
   float x = 2;
   float y = 3;
   float z = 4;
+}
+
+message ClientLobbyPosition {
+    double x = 1;
+    double y = 2;
+    double z = 3;
 }
 
 message ChatMessage {
@@ -46,9 +55,10 @@ message Heartbeat {
 }
 
 message HeartbeatAck {
-    string client_id = 1;
+    string clientId = 1;
 }
 
 message ServerStatus {
   string message = 1;
+  string clientId = 2;
 }

@@ -11,8 +11,8 @@ var modules []ServerModule
 func init() {
 	modules = []ServerModule{
 		NewConnectionModule(),
-		NewChatModule(),
 		NewLobbyModule(),
+		NewChatModule(),
 	}
 }
 
