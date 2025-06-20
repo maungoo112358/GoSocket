@@ -18,7 +18,7 @@ type ClientInfo struct {
 	Address       net.Addr
 	LastHeartbeat time.Time
 	ConnectedAt   time.Time
-	ColorHex      string // For lobby state
+	ColorHex      string
 	ColorHex_Head string
 }
 
@@ -60,58 +60,26 @@ func removeClient(conn net.PacketConn, privateID string) *ClientInfo {
 		return nil
 	}
 
-	// Clean up from allClients
 	delete(allClients, privateID)
 
-	// Clean up lobby position
 	allClientsLobbyPosMu.Lock()
 	delete(allClientsLobbyPos, client.PublicID)
 	allClientsLobbyPosMu.Unlock()
 
 	allClientsMu.Unlock()
 
-	// Clean up ID maps
 	cleanupClientIDs(client.PrivateID, client.PublicID)
 
 	fmt.Printf("❌ Client disconnected: %s (%s)\n", client.Name, client.PublicID)
 
-	// Broadcast if they were in lobby
+	//when client is in the lobby
 	if client.ColorHex != "" {
-		broadcastPlayerLeft(conn, client) // ← Add conn parameter
+		broadcastPlayerLeft(conn, client)
 	}
 
 	return client
 }
 
-func getClient(privateID string) (*ClientInfo, bool) {
-	allClientsMu.RLock()
-	defer allClientsMu.RUnlock()
-
-	client, exists := allClients[privateID]
-	return client, exists
-}
-
-func getAllClients() map[string]*ClientInfo {
-	allClientsMu.RLock()
-	defer allClientsMu.RUnlock()
-
-	// Return a copy to avoid holding the lock
-	result := make(map[string]*ClientInfo)
-	for k, v := range allClients {
-		// Create a copy of the client info
-		clientCopy := *v
-		result[k] = &clientCopy
-	}
-	return result
-}
-
-func getClientCount() int {
-	allClientsMu.RLock()
-	defer allClientsMu.RUnlock()
-	return len(allClients)
-}
-
-// Broadcast to all connected clients
 func broadcastToAll(conn net.PacketConn, packet *gamepacket.GamePacket, excludePrivateID string) {
 	data, err := proto.Marshal(packet)
 	if err != nil {
@@ -134,22 +102,6 @@ func broadcastToAll(conn net.PacketConn, packet *gamepacket.GamePacket, excludeP
 	fmt.Printf("📡 Broadcast sent to %d clients\n", sentCount)
 }
 
-// Send to specific client by privateID
-func sendToClient(conn net.PacketConn, privateID string, packet *gamepacket.GamePacket) bool {
-	client, exists := getClient(privateID)
-	if !exists {
-		return false
-	}
-
-	data, err := proto.Marshal(packet)
-	if err != nil {
-		return false
-	}
-
-	_, err = conn.WriteTo(data, client.Address)
-	return err == nil
-}
-
 func updateHeartbeat(privateID string) bool {
 	allClientsMu.Lock()
 	defer allClientsMu.Unlock()
@@ -162,7 +114,7 @@ func updateHeartbeat(privateID string) bool {
 }
 
 func startHeartbeatChecker(conn net.PacketConn) {
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	go func() {
 		for range ticker.C {
 			now := time.Now()
@@ -170,7 +122,7 @@ func startHeartbeatChecker(conn net.PacketConn) {
 
 			allClientsMu.RLock()
 			for privateID, client := range allClients {
-				if now.Sub(client.LastHeartbeat) > 5*time.Second {
+				if now.Sub(client.LastHeartbeat) > 10*time.Second {
 					toRemove = append(toRemove, privateID)
 				}
 			}
@@ -178,7 +130,7 @@ func startHeartbeatChecker(conn net.PacketConn) {
 
 			// Remove timed out clients
 			for _, privateID := range toRemove {
-				removeClient(conn, privateID) // ← Pass conn parameter
+				removeClient(conn, privateID)
 			}
 
 			if len(toRemove) > 0 {
@@ -188,41 +140,6 @@ func startHeartbeatChecker(conn net.PacketConn) {
 	}()
 }
 
-// Add these functions to your existing client.go file
-
-// Get clients currently in lobby (have a color)
-func getLobbyClients() map[string]*ClientInfo {
-	allClientsMu.RLock()
-	defer allClientsMu.RUnlock()
-
-	result := make(map[string]*ClientInfo)
-	for privateID, client := range allClients {
-		if client.ColorHex != "" {
-			clientCopy := *client
-			result[privateID] = &clientCopy
-		}
-	}
-	return result
-}
-
-// Get lobby statistics
-func getLobbyStats() (int, int) {
-	allClientsMu.RLock()
-	defer allClientsMu.RUnlock()
-
-	totalClients := len(allClients)
-	lobbyClients := 0
-
-	for _, client := range allClients {
-		if client.ColorHex != "" {
-			lobbyClients++
-		}
-	}
-
-	return lobbyClients, totalClients
-}
-
-// Broadcast when a player leaves the lobby
 func broadcastPlayerLeft(conn net.PacketConn, leftClient *ClientInfo) {
 	if leftClient.ColorHex == "" {
 		return // Client never joined lobby, no need to broadcast
@@ -234,10 +151,16 @@ func broadcastPlayerLeft(conn net.PacketConn, leftClient *ClientInfo) {
 		Seq: uint32(rand.Intn(10000)),
 		ServerStatus: &gamepacket.ServerStatus{
 			Message:  leaveMessage,
-			ClientId: leftClient.PublicID, // ← Add this field
+			ClientId: leftClient.PublicID,
 		},
 	}
 
 	broadcastToAll(conn, leavePacket, leftClient.PrivateID)
 	fmt.Printf("📤 Broadcast: %s left the lobby\n", leftClient.PublicID)
+}
+
+func getClientCount() int {
+	allClientsMu.RLock()
+	defer allClientsMu.RUnlock()
+	return len(allClients)
 }
