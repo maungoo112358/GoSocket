@@ -139,7 +139,7 @@ func (x *GamePacket) GetServerStatus() *ServerStatus {
 
 type HandshakeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ClientName    string                 `protobuf:"bytes,1,opt,name=clientName,proto3" json:"clientName,omitempty"` // optional nickname from client
+	ClientName    string                 `protobuf:"bytes,1,opt,name=clientName,proto3" json:"clientName,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -237,8 +237,7 @@ type LobbyJoinBroadcast struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PublicId      string                 `protobuf:"bytes,1,opt,name=publicId,proto3" json:"publicId,omitempty"`
 	Colorhex      string                 `protobuf:"bytes,2,opt,name=colorhex,proto3" json:"colorhex,omitempty"`
-	Position      *ClientLobbyPosition   `protobuf:"bytes,3,opt,name=position,proto3" json:"position,omitempty"` // New field
-	ColorhexHead  string                 `protobuf:"bytes,4,opt,name=colorhex_head,json=colorhexHead,proto3" json:"colorhex_head,omitempty"`
+	Position      *ClientLobbyPosition   `protobuf:"bytes,3,opt,name=position,proto3" json:"position,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -292,13 +291,6 @@ func (x *LobbyJoinBroadcast) GetPosition() *ClientLobbyPosition {
 		return x.Position
 	}
 	return nil
-}
-
-func (x *LobbyJoinBroadcast) GetColorhexHead() string {
-	if x != nil {
-		return x.ColorhexHead
-	}
-	return ""
 }
 
 type ClientPosition struct {
@@ -645,12 +637,11 @@ const file_gamepacket_proto_rawDesc = "" +
 	"clientName\"M\n" +
 	"\x11HandshakeResponse\x12\x1c\n" +
 	"\tprivateId\x18\x01 \x01(\tR\tprivateId\x12\x1a\n" +
-	"\bpublicId\x18\x02 \x01(\tR\bpublicId\"\xae\x01\n" +
+	"\bpublicId\x18\x02 \x01(\tR\bpublicId\"\x89\x01\n" +
 	"\x12LobbyJoinBroadcast\x12\x1a\n" +
 	"\bpublicId\x18\x01 \x01(\tR\bpublicId\x12\x1a\n" +
 	"\bcolorhex\x18\x02 \x01(\tR\bcolorhex\x12;\n" +
-	"\bposition\x18\x03 \x01(\v2\x1f.gamepacket.ClientLobbyPositionR\bposition\x12#\n" +
-	"\rcolorhex_head\x18\x04 \x01(\tR\fcolorhexHead\"V\n" +
+	"\bposition\x18\x03 \x01(\v2\x1f.gamepacket.ClientLobbyPositionR\bposition\"V\n" +
 	"\x0eClientPosition\x12\x1a\n" +
 	"\bclientId\x18\x01 \x01(\tR\bclientId\x12\f\n" +
 	"\x01x\x18\x02 \x01(\x02R\x01x\x12\f\n" +

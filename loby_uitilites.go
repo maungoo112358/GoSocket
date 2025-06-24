@@ -18,40 +18,27 @@ var availableColors = []string{
 	"#f95c16", "#b9a01b", "#84eb5e", "#11ec6e", "#da3fe7",
 }
 
-type ColorPair struct {
-	Head string
-	Body string
-}
-
-func getAvailableColorPair() (ColorPair, bool) {
+func getAvailableColor() (string, bool) {
 	allClientsMu.RLock()
 	defer allClientsMu.RUnlock()
 
-	usedPairs := make(map[string]bool)
+	used := make(map[string]bool)
 	for _, client := range allClients {
-		if client.ColorHex_Head != "" && client.ColorHex != "" {
-			key := client.ColorHex_Head + "|" + client.ColorHex
-			usedPairs[key] = true
+		if client.ColorHex != "" {
+			used[client.ColorHex] = true
 		}
 	}
 
-	var availablePairs []ColorPair
-	for _, head := range availableColors {
-		for _, body := range availableColors {
-			if head == body {
-				continue
-			}
-			key := head + "|" + body
-			if !usedPairs[key] {
-				availablePairs = append(availablePairs, ColorPair{Head: head, Body: body})
-			}
+	available := make([]string, 0)
+	for _, color := range availableColors {
+		if !used[color] {
+			available = append(available, color)
 		}
 	}
 
-	if len(availablePairs) == 0 {
-		return ColorPair{}, false
+	if len(available) == 0 {
+		return "", false
 	}
 
-	selected := availablePairs[rand.Intn(len(availablePairs))]
-	return selected, true
+	return available[rand.Intn(len(available))], true
 }

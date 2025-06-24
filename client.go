@@ -19,7 +19,6 @@ type ClientInfo struct {
 	LastHeartbeat time.Time
 	ConnectedAt   time.Time
 	ColorHex      string
-	ColorHex_Head string
 }
 
 var (
@@ -49,7 +48,8 @@ func addClient(privateID, publicID, name string, addr net.Addr) {
 		ConnectedAt:   time.Now(),
 	}
 
-	fmt.Printf("✅ Client connected: %s (%s) from %s\n", name, publicID, addr)
+	// fmt.Printf("✅ Client connected: %s (%s) from %s\n", name, publicID, addr)
+	fmt.Printf("✅ Client connected: %s from %s\n", publicID, addr)
 }
 
 func removeClient(conn net.PacketConn, privateID string) *ClientInfo {
@@ -142,7 +142,7 @@ func startHeartbeatChecker(conn net.PacketConn) {
 
 func broadcastPlayerLeft(conn net.PacketConn, leftClient *ClientInfo) {
 	if leftClient.ColorHex == "" {
-		return // Client never joined lobby, no need to broadcast
+		return
 	}
 
 	leaveMessage := fmt.Sprintf("Player %s left the lobby", leftClient.PublicID)

@@ -17,7 +17,7 @@ message GamePacket {
 }
 
 message HandshakeRequest {
-  string clientName = 1; // optional nickname from client
+  string clientName = 1;
 }
 
 message HandshakeResponse {
@@ -28,8 +28,7 @@ message HandshakeResponse {
 message LobbyJoinBroadcast {
     string publicId = 1;
     string colorhex = 2;
-    ClientLobbyPosition position = 3;  // New field
-    string colorhex_head= 4;
+    ClientLobbyPosition position = 3;
 }
 
 message ClientPosition {
