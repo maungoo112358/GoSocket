@@ -29,23 +29,22 @@ message LobbyJoinBroadcast {
     string publicId = 1;
     string colorhex = 2;
     ClientLobbyPosition position = 3;
+    bool isLocalPlayer = 4;
 }
 
 message ClientPosition {
-  string clientId = 1; // who sent this
-  float x = 2;
-  float y = 3;
-  float z = 4;
+  string clientId = 1;
+  float timestamp = 2;
+  Position position = 3;
+  Velocity velocity = 4;
 }
 
 message ClientLobbyPosition {
-    double x = 1;
-    double y = 2;
-    double z = 3;
+    Position position = 1;
 }
 
 message ChatMessage {
-  string clientId = 1; // who said it
+  string clientId = 1;
   string message = 2;
 }
 
@@ -60,4 +59,16 @@ message HeartbeatAck {
 message ServerStatus {
   string message = 1;
   string clientId = 2;
+}
+
+message Position{
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+message Velocity{
+  double x = 1;
+  double y = 2;
+  double z = 3;
 }

@@ -238,6 +238,7 @@ type LobbyJoinBroadcast struct {
 	PublicId      string                 `protobuf:"bytes,1,opt,name=publicId,proto3" json:"publicId,omitempty"`
 	Colorhex      string                 `protobuf:"bytes,2,opt,name=colorhex,proto3" json:"colorhex,omitempty"`
 	Position      *ClientLobbyPosition   `protobuf:"bytes,3,opt,name=position,proto3" json:"position,omitempty"`
+	IsLocalPlayer bool                   `protobuf:"varint,4,opt,name=isLocalPlayer,proto3" json:"isLocalPlayer,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -293,12 +294,19 @@ func (x *LobbyJoinBroadcast) GetPosition() *ClientLobbyPosition {
 	return nil
 }
 
+func (x *LobbyJoinBroadcast) GetIsLocalPlayer() bool {
+	if x != nil {
+		return x.IsLocalPlayer
+	}
+	return false
+}
+
 type ClientPosition struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ClientId      string                 `protobuf:"bytes,1,opt,name=clientId,proto3" json:"clientId,omitempty"` // who sent this
-	X             float32                `protobuf:"fixed32,2,opt,name=x,proto3" json:"x,omitempty"`
-	Y             float32                `protobuf:"fixed32,3,opt,name=y,proto3" json:"y,omitempty"`
-	Z             float32                `protobuf:"fixed32,4,opt,name=z,proto3" json:"z,omitempty"`
+	ClientId      string                 `protobuf:"bytes,1,opt,name=clientId,proto3" json:"clientId,omitempty"`
+	Timestamp     float32                `protobuf:"fixed32,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Position      *Position              `protobuf:"bytes,3,opt,name=position,proto3" json:"position,omitempty"`
+	Velocity      *Velocity              `protobuf:"bytes,4,opt,name=velocity,proto3" json:"velocity,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -340,32 +348,30 @@ func (x *ClientPosition) GetClientId() string {
 	return ""
 }
 
-func (x *ClientPosition) GetX() float32 {
+func (x *ClientPosition) GetTimestamp() float32 {
 	if x != nil {
-		return x.X
+		return x.Timestamp
 	}
 	return 0
 }
 
-func (x *ClientPosition) GetY() float32 {
+func (x *ClientPosition) GetPosition() *Position {
 	if x != nil {
-		return x.Y
+		return x.Position
 	}
-	return 0
+	return nil
 }
 
-func (x *ClientPosition) GetZ() float32 {
+func (x *ClientPosition) GetVelocity() *Velocity {
 	if x != nil {
-		return x.Z
+		return x.Velocity
 	}
-	return 0
+	return nil
 }
 
 type ClientLobbyPosition struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	X             float64                `protobuf:"fixed64,1,opt,name=x,proto3" json:"x,omitempty"`
-	Y             float64                `protobuf:"fixed64,2,opt,name=y,proto3" json:"y,omitempty"`
-	Z             float64                `protobuf:"fixed64,3,opt,name=z,proto3" json:"z,omitempty"`
+	Position      *Position              `protobuf:"bytes,1,opt,name=position,proto3" json:"position,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -400,30 +406,16 @@ func (*ClientLobbyPosition) Descriptor() ([]byte, []int) {
 	return file_gamepacket_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *ClientLobbyPosition) GetX() float64 {
+func (x *ClientLobbyPosition) GetPosition() *Position {
 	if x != nil {
-		return x.X
+		return x.Position
 	}
-	return 0
-}
-
-func (x *ClientLobbyPosition) GetY() float64 {
-	if x != nil {
-		return x.Y
-	}
-	return 0
-}
-
-func (x *ClientLobbyPosition) GetZ() float64 {
-	if x != nil {
-		return x.Z
-	}
-	return 0
+	return nil
 }
 
 type ChatMessage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ClientId      string                 `protobuf:"bytes,1,opt,name=clientId,proto3" json:"clientId,omitempty"` // who said it
+	ClientId      string                 `protobuf:"bytes,1,opt,name=clientId,proto3" json:"clientId,omitempty"`
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -613,6 +605,126 @@ func (x *ServerStatus) GetClientId() string {
 	return ""
 }
 
+type Position struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	X             float64                `protobuf:"fixed64,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y             float64                `protobuf:"fixed64,2,opt,name=y,proto3" json:"y,omitempty"`
+	Z             float64                `protobuf:"fixed64,3,opt,name=z,proto3" json:"z,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Position) Reset() {
+	*x = Position{}
+	mi := &file_gamepacket_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Position) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Position) ProtoMessage() {}
+
+func (x *Position) ProtoReflect() protoreflect.Message {
+	mi := &file_gamepacket_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Position.ProtoReflect.Descriptor instead.
+func (*Position) Descriptor() ([]byte, []int) {
+	return file_gamepacket_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *Position) GetX() float64 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *Position) GetY() float64 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+func (x *Position) GetZ() float64 {
+	if x != nil {
+		return x.Z
+	}
+	return 0
+}
+
+type Velocity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	X             float64                `protobuf:"fixed64,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y             float64                `protobuf:"fixed64,2,opt,name=y,proto3" json:"y,omitempty"`
+	Z             float64                `protobuf:"fixed64,3,opt,name=z,proto3" json:"z,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Velocity) Reset() {
+	*x = Velocity{}
+	mi := &file_gamepacket_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Velocity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Velocity) ProtoMessage() {}
+
+func (x *Velocity) ProtoReflect() protoreflect.Message {
+	mi := &file_gamepacket_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Velocity.ProtoReflect.Descriptor instead.
+func (*Velocity) Descriptor() ([]byte, []int) {
+	return file_gamepacket_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *Velocity) GetX() float64 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *Velocity) GetY() float64 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+func (x *Velocity) GetZ() float64 {
+	if x != nil {
+		return x.Z
+	}
+	return 0
+}
+
 var File_gamepacket_proto protoreflect.FileDescriptor
 
 const file_gamepacket_proto_rawDesc = "" +
@@ -637,20 +749,19 @@ const file_gamepacket_proto_rawDesc = "" +
 	"clientName\"M\n" +
 	"\x11HandshakeResponse\x12\x1c\n" +
 	"\tprivateId\x18\x01 \x01(\tR\tprivateId\x12\x1a\n" +
-	"\bpublicId\x18\x02 \x01(\tR\bpublicId\"\x89\x01\n" +
+	"\bpublicId\x18\x02 \x01(\tR\bpublicId\"\xaf\x01\n" +
 	"\x12LobbyJoinBroadcast\x12\x1a\n" +
 	"\bpublicId\x18\x01 \x01(\tR\bpublicId\x12\x1a\n" +
 	"\bcolorhex\x18\x02 \x01(\tR\bcolorhex\x12;\n" +
-	"\bposition\x18\x03 \x01(\v2\x1f.gamepacket.ClientLobbyPositionR\bposition\"V\n" +
+	"\bposition\x18\x03 \x01(\v2\x1f.gamepacket.ClientLobbyPositionR\bposition\x12$\n" +
+	"\risLocalPlayer\x18\x04 \x01(\bR\risLocalPlayer\"\xae\x01\n" +
 	"\x0eClientPosition\x12\x1a\n" +
-	"\bclientId\x18\x01 \x01(\tR\bclientId\x12\f\n" +
-	"\x01x\x18\x02 \x01(\x02R\x01x\x12\f\n" +
-	"\x01y\x18\x03 \x01(\x02R\x01y\x12\f\n" +
-	"\x01z\x18\x04 \x01(\x02R\x01z\"?\n" +
-	"\x13ClientLobbyPosition\x12\f\n" +
-	"\x01x\x18\x01 \x01(\x01R\x01x\x12\f\n" +
-	"\x01y\x18\x02 \x01(\x01R\x01y\x12\f\n" +
-	"\x01z\x18\x03 \x01(\x01R\x01z\"C\n" +
+	"\bclientId\x18\x01 \x01(\tR\bclientId\x12\x1c\n" +
+	"\ttimestamp\x18\x02 \x01(\x02R\ttimestamp\x120\n" +
+	"\bposition\x18\x03 \x01(\v2\x14.gamepacket.PositionR\bposition\x120\n" +
+	"\bvelocity\x18\x04 \x01(\v2\x14.gamepacket.VelocityR\bvelocity\"G\n" +
+	"\x13ClientLobbyPosition\x120\n" +
+	"\bposition\x18\x01 \x01(\v2\x14.gamepacket.PositionR\bposition\"C\n" +
 	"\vChatMessage\x12\x1a\n" +
 	"\bclientId\x18\x01 \x01(\tR\bclientId\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"'\n" +
@@ -660,7 +771,15 @@ const file_gamepacket_proto_rawDesc = "" +
 	"\bclientId\x18\x01 \x01(\tR\bclientId\"D\n" +
 	"\fServerStatus\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1a\n" +
-	"\bclientId\x18\x02 \x01(\tR\bclientIdB\x15Z\x13gosocket/gamepacketb\x06proto3"
+	"\bclientId\x18\x02 \x01(\tR\bclientId\"4\n" +
+	"\bPosition\x12\f\n" +
+	"\x01x\x18\x01 \x01(\x01R\x01x\x12\f\n" +
+	"\x01y\x18\x02 \x01(\x01R\x01y\x12\f\n" +
+	"\x01z\x18\x03 \x01(\x01R\x01z\"4\n" +
+	"\bVelocity\x12\f\n" +
+	"\x01x\x18\x01 \x01(\x01R\x01x\x12\f\n" +
+	"\x01y\x18\x02 \x01(\x01R\x01y\x12\f\n" +
+	"\x01z\x18\x03 \x01(\x01R\x01zB\x15Z\x13gosocket/gamepacketb\x06proto3"
 
 var (
 	file_gamepacket_proto_rawDescOnce sync.Once
@@ -674,7 +793,7 @@ func file_gamepacket_proto_rawDescGZIP() []byte {
 	return file_gamepacket_proto_rawDescData
 }
 
-var file_gamepacket_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_gamepacket_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_gamepacket_proto_goTypes = []any{
 	(*GamePacket)(nil),          // 0: gamepacket.GamePacket
 	(*HandshakeRequest)(nil),    // 1: gamepacket.HandshakeRequest
@@ -686,6 +805,8 @@ var file_gamepacket_proto_goTypes = []any{
 	(*Heartbeat)(nil),           // 7: gamepacket.Heartbeat
 	(*HeartbeatAck)(nil),        // 8: gamepacket.HeartbeatAck
 	(*ServerStatus)(nil),        // 9: gamepacket.ServerStatus
+	(*Position)(nil),            // 10: gamepacket.Position
+	(*Velocity)(nil),            // 11: gamepacket.Velocity
 }
 var file_gamepacket_proto_depIdxs = []int32{
 	1,  // 0: gamepacket.GamePacket.HandshakeRequest:type_name -> gamepacket.HandshakeRequest
@@ -698,11 +819,14 @@ var file_gamepacket_proto_depIdxs = []int32{
 	5,  // 7: gamepacket.GamePacket.ClientLobbyPosition:type_name -> gamepacket.ClientLobbyPosition
 	9,  // 8: gamepacket.GamePacket.ServerStatus:type_name -> gamepacket.ServerStatus
 	5,  // 9: gamepacket.LobbyJoinBroadcast.position:type_name -> gamepacket.ClientLobbyPosition
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	10, // 10: gamepacket.ClientPosition.position:type_name -> gamepacket.Position
+	11, // 11: gamepacket.ClientPosition.velocity:type_name -> gamepacket.Velocity
+	10, // 12: gamepacket.ClientLobbyPosition.position:type_name -> gamepacket.Position
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_gamepacket_proto_init() }
@@ -716,7 +840,7 @@ func file_gamepacket_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gamepacket_proto_rawDesc), len(file_gamepacket_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

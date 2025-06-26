@@ -39,15 +39,47 @@ func (m *LobbyModule) Handle(conn net.PacketConn, addr net.Addr, pkt *gamepacket
 
 	position := generateUniquePosition(joiningClient.PublicID)
 	lobby.Position = &gamepacket.ClientLobbyPosition{
-		X: position.X,
-		Y: position.Y,
-		Z: position.Z,
-	}
 
+		Position: &gamepacket.Position{
+			X: position.X,
+			Y: position.Y,
+			Z: position.Z,
+		},
+	}
+	m.sendToLocalClient(conn, joiningClient, lobby)
+	m.sendToRemoteClients(conn, joiningClient, lobby)
 	m.sendWelcomeMessage(conn, joiningClient)
 	m.sendLobbyStatusToClient(conn, joiningClient)
-	broadcastToAll(conn, pkt, "")
 	m.sendLobbyStats(conn, joiningClient)
+}
+
+func (m *LobbyModule) sendToLocalClient(conn net.PacketConn, localClieent *ClientInfo, lobby *gamepacket.LobbyJoinBroadcast) {
+	localPacket := &gamepacket.GamePacket{
+		Seq: uint32(rand.Intn(100000)),
+		LobbyJoinBroadcast: &gamepacket.LobbyJoinBroadcast{
+			PublicId:      lobby.PublicId,
+			Colorhex:      lobby.Colorhex,
+			Position:      lobby.Position,
+			IsLocalPlayer: true,
+		},
+	}
+	if data, err := proto.Marshal(localPacket); err == nil {
+		conn.WriteTo(data, localClieent.Address)
+		fmt.Printf("🎮 Sent local player confirmation to %s\n", localClieent.PublicID)
+	}
+}
+
+func (m *LobbyModule) sendToRemoteClients(conn net.PacketConn, remoteClient *ClientInfo, lobby *gamepacket.LobbyJoinBroadcast) {
+	remotePacket := &gamepacket.GamePacket{
+		Seq: uint32(rand.Intn(100000)),
+		LobbyJoinBroadcast: &gamepacket.LobbyJoinBroadcast{
+			PublicId:      lobby.PublicId,
+			Colorhex:      lobby.Colorhex,
+			Position:      lobby.Position,
+			IsLocalPlayer: false,
+		},
+	}
+	broadcastToAll(conn, remotePacket, remoteClient.PrivateID)
 }
 
 func (m *LobbyModule) findAndUpdateClient(publicID string) *ClientInfo {
@@ -112,9 +144,11 @@ func (m *LobbyModule) sendLobbyStatusToClient(conn net.PacketConn, newClient *Cl
 		var lobbyPosition *gamepacket.ClientLobbyPosition
 		if position, hasPosition := allClientsLobbyPos[client.PublicID]; hasPosition {
 			lobbyPosition = &gamepacket.ClientLobbyPosition{
-				X: position.X,
-				Y: position.Y,
-				Z: position.Z,
+				Position: &gamepacket.Position{
+					X: position.X,
+					Y: position.Y,
+					Z: position.Z,
+				},
 			}
 		}
 

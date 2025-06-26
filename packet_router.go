@@ -12,6 +12,7 @@ func init() {
 	modules = []ServerModule{
 		NewConnectionModule(),
 		NewLobbyModule(),
+		NewMovementModule(),
 		NewChatModule(),
 	}
 }
