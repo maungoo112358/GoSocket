@@ -10,9 +10,13 @@ message GamePacket {
   Heartbeat Heartbeat = 4;
   HeartbeatAck HeartbeatAck = 5;
   ClientPosition ClientPosition = 6;
-  ChatMessage ChatMessage = 7;
-  LobbyJoinBroadcast LobbyJoinBroadcast = 8;
-  ClientLobbyPosition ClientLobbyPosition = 9;
+  LobbyJoinBroadcast LobbyJoinBroadcast = 7;
+  ClientLobbyPosition ClientLobbyPosition = 8;
+  UsernamePrompt UsernamePrompt = 9;          
+  UsernameSubmission UsernameSubmission = 10;  
+  UsernameResponse UsernameResponse = 11;   
+  ReconnectionRequest ReconnectionRequest = 12;
+  ReconnectionResponse ReconnectionResponse = 13;
   ServerStatus ServerStatus = 99;
 }
 
@@ -25,11 +29,38 @@ message HandshakeResponse {
   string publicId = 2;
 }
 
+message UsernamePrompt {
+  string message = 1; 
+}
+
+message UsernameSubmission {
+  string username = 1;
+}
+
+message UsernameResponse {
+  string username = 1;
+  bool isAccepted = 2;
+  string message = 3;
+  repeated string suggestions = 4;
+}
+
+message ReconnectionRequest {
+  string username = 1;
+  string sessionToken = 2;
+}
+
+message ReconnectionResponse {
+  bool isSuccessful = 1;
+  string message = 2;
+  string privateId = 3;
+  string publicId = 4;
+}
+
 message LobbyJoinBroadcast {
-    string publicId = 1;
-    string colorhex = 2;
-    ClientLobbyPosition position = 3;
-    bool isLocalPlayer = 4;
+  string publicId = 1;
+  string colorhex = 2;
+  ClientLobbyPosition position = 3;
+  bool isLocalPlayer = 4;
 }
 
 message ClientPosition {
@@ -40,12 +71,7 @@ message ClientPosition {
 }
 
 message ClientLobbyPosition {
-    Position position = 1;
-}
-
-message ChatMessage {
-  string clientId = 1;
-  string message = 2;
+  Position position = 1;
 }
 
 message Heartbeat {
@@ -53,7 +79,7 @@ message Heartbeat {
 }
 
 message HeartbeatAck {
-    string clientId = 1;
+  string clientId = 1;
 }
 
 message ServerStatus {

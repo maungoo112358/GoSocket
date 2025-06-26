@@ -13,7 +13,6 @@ func init() {
 		NewConnectionModule(),
 		NewLobbyModule(),
 		NewMovementModule(),
-		NewChatModule(),
 	}
 }
 

@@ -32,11 +32,21 @@ func (m *MovementModule) Handle(conn net.PacketConn, addr net.Addr, pkt *gamepac
 		return
 	}
 
-	// fmt.Printf("🏃 MOVEMENT: %s at (%.2f, %.2f, %.2f)\n", clientPos.ClientId, clientPos.Position.X, clientPos.Position.Y, clientPos.Position.Z)
+	// ✅ Add validation
+	if !isValidPosition(clientPos.Position) {
+		fmt.Printf("⚠️ Invalid position from %s: %.2f,%.2f,%.2f\n",
+			clientPos.ClientId, clientPos.Position.X, clientPos.Position.Y, clientPos.Position.Z)
+		return
+	}
 
 	clientPos.Timestamp = float32(time.Now().UnixMilli()) / 1000.0
-
 	m.broadcastMovement(conn, clientPos)
+}
+
+func isValidPosition(pos *gamepacket.Position) bool {
+	return pos.X >= -1000 && pos.X <= 1000 &&
+		pos.Y >= -10 && pos.Y <= 100 &&
+		pos.Z >= -1000 && pos.Z <= 1000
 }
 
 func (m *MovementModule) broadcastMovement(conn net.PacketConn, clientPos *gamepacket.ClientPosition) {

@@ -33,19 +33,23 @@ func (m *LobbyModule) Handle(conn net.PacketConn, addr net.Addr, pkt *gamepacket
 		fmt.Printf("⚠️ Lobby join from unknown client: %s\n", lobby.PublicId)
 		return
 	}
+
+	// Mark client as being in lobby - important for disconnect handling
+	m.setClientLobbyStatus(joiningClient.PrivateID, true)
+
 	lobby.Colorhex = joiningClient.ColorHex
 
-	fmt.Printf("🎨 %s joined lobby with color %s\n", lobby.PublicId, lobby.Colorhex)
+	fmt.Printf("🎨 %s joined lobby with color %s (now in lobby)\n", lobby.PublicId, lobby.Colorhex)
 
 	position := generateUniquePosition(joiningClient.PublicID)
 	lobby.Position = &gamepacket.ClientLobbyPosition{
-
 		Position: &gamepacket.Position{
 			X: position.X,
 			Y: position.Y,
 			Z: position.Z,
 		},
 	}
+
 	m.sendToLocalClient(conn, joiningClient, lobby)
 	m.sendToRemoteClients(conn, joiningClient, lobby)
 	m.sendWelcomeMessage(conn, joiningClient)
@@ -53,7 +57,17 @@ func (m *LobbyModule) Handle(conn net.PacketConn, addr net.Addr, pkt *gamepacket
 	m.sendLobbyStats(conn, joiningClient)
 }
 
-func (m *LobbyModule) sendToLocalClient(conn net.PacketConn, localClieent *ClientInfo, lobby *gamepacket.LobbyJoinBroadcast) {
+func (m *LobbyModule) setClientLobbyStatus(privateID string, inLobby bool) {
+	allClientsMu.Lock()
+	defer allClientsMu.Unlock()
+
+	if client, exists := allClients[privateID]; exists {
+		client.InLobby = inLobby
+		fmt.Printf("📍 Client %s lobby status updated: %t\n", client.PublicID, inLobby)
+	}
+}
+
+func (m *LobbyModule) sendToLocalClient(conn net.PacketConn, localClient *ClientInfo, lobby *gamepacket.LobbyJoinBroadcast) {
 	localPacket := &gamepacket.GamePacket{
 		Seq: uint32(rand.Intn(100000)),
 		LobbyJoinBroadcast: &gamepacket.LobbyJoinBroadcast{
@@ -64,8 +78,8 @@ func (m *LobbyModule) sendToLocalClient(conn net.PacketConn, localClieent *Clien
 		},
 	}
 	if data, err := proto.Marshal(localPacket); err == nil {
-		conn.WriteTo(data, localClieent.Address)
-		fmt.Printf("🎮 Sent local player confirmation to %s\n", localClieent.PublicID)
+		conn.WriteTo(data, localClient.Address)
+		fmt.Printf("🎮 Sent local player confirmation to %s (now in lobby)\n", localClient.PublicID)
 	}
 }
 
@@ -90,7 +104,9 @@ func (m *LobbyModule) findAndUpdateClient(publicID string) *ClientInfo {
 
 	for _, client := range allClients {
 		if client.PublicID == publicID {
-			fmt.Printf("✅ Found %s, current color: '%s'\n", publicID, client.ColorHex)
+			fmt.Printf("✅ Found %s, current color: '%s', in lobby: %t\n", publicID, client.ColorHex, client.InLobby)
+
+			// Assign color if not already assigned
 			if client.ColorHex == "" {
 				fmt.Printf("🎨 Assigning color to %s\n", publicID)
 
@@ -121,7 +137,7 @@ func (m *LobbyModule) sendWelcomeMessage(conn net.PacketConn, client *ClientInfo
 	welcomePacket := &gamepacket.GamePacket{
 		Seq: uint32(rand.Intn(10000)),
 		ServerStatus: &gamepacket.ServerStatus{
-			Message: fmt.Sprintf("Welcome to the lobby, %s! You are now connected.", client.PublicID),
+			Message: fmt.Sprintf("Welcome to the lobby, %s! You are now connected and in the lobby.", client.PublicID),
 		},
 	}
 
@@ -137,7 +153,8 @@ func (m *LobbyModule) sendLobbyStatusToClient(conn net.PacketConn, newClient *Cl
 	existingPlayersCount := 0
 
 	for _, client := range allClients {
-		if client.PublicID == newClient.PublicID || client.ColorHex == "" {
+		// Skip self and clients not in lobby
+		if client.PublicID == newClient.PublicID || client.ColorHex == "" || !client.InLobby {
 			continue
 		}
 
@@ -182,7 +199,7 @@ func (m *LobbyModule) sendLobbyStats(conn net.PacketConn, client *ClientInfo) {
 	lobbyClients := 0
 
 	for _, c := range allClients {
-		if c.ColorHex != "" {
+		if c.ColorHex != "" && c.InLobby {
 			lobbyClients++
 		}
 	}
