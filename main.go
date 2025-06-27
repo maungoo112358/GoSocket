@@ -1,5 +1,5 @@
 package main
 
 func main() {
-	startServer(":9999")
+	StartServer(":9999")
 }

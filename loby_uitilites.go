@@ -19,11 +19,11 @@ var availableColors = []string{
 }
 
 func getAvailableColor() (string, bool) {
-	allClientsMu.RLock()
-	defer allClientsMu.RUnlock()
+	activeClientsMutex.RLock()
+	defer activeClientsMutex.RUnlock()
 
 	used := make(map[string]bool)
-	for _, client := range allClients {
+	for _, client := range activeClients {
 		if client.ColorHex != "" {
 			used[client.ColorHex] = true
 		}
