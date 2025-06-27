@@ -96,7 +96,7 @@ func (m *ConnectionModule) handleUsernameSubmission(conn net.PacketConn, addr ne
 		return
 	}
 
-	// Check username availability
+	// Check username availability using new heartbeat-based validation
 	if m.isUsernameAvailable(username) {
 		// Username is valid - create the client and complete connection
 		privateID := generatePrivateID()
@@ -104,7 +104,6 @@ func (m *ConnectionModule) handleUsernameSubmission(conn net.PacketConn, addr ne
 		// Remove from pending clients and add to active clients
 		removePendingClient(addr)
 		addClient(privateID, username, submission.Username, addr)
-		m.removeDisconnectedClientByUsername(username)
 
 		// Send final handshake with real IDs
 		response := &gamepacket.GamePacket{
@@ -193,19 +192,37 @@ func (m *ConnectionModule) handleHeartbeat(conn net.PacketConn, addr net.Addr, p
 	}
 }
 
-// Username validation methods
+// NEW: Heartbeat-based username validation
 func (m *ConnectionModule) isUsernameAvailable(username string) bool {
-	allClientsMu.RLock()
-	defer allClientsMu.RUnlock()
+	allClientsMu.Lock()
+	defer allClientsMu.Unlock()
 
 	usernameLower := strings.ToLower(username)
+	now := time.Now()
 
-	for _, client := range allClients {
+	for privateID, client := range allClients {
 		if strings.ToLower(client.PublicID) == usernameLower {
-			return false
+			// Check if client is recently active (last heartbeat < 10 seconds)
+			if now.Sub(client.LastHeartbeat) < 10*time.Second {
+				fmt.Printf("🔒 Username '%s' is taken by active client %s (last heartbeat: %.1fs ago)\n",
+					username, client.PublicID, now.Sub(client.LastHeartbeat).Seconds())
+				return false
+			} else {
+				// Client is stale - remove them and allow new registration
+				fmt.Printf("🗑️ Removing stale client %s (last heartbeat: %.1fs ago)\n",
+					client.PublicID, now.Sub(client.LastHeartbeat).Seconds())
+
+				// Clean up stale client
+				delete(allClients, privateID)
+				cleanupClientData(client)
+
+				fmt.Printf("✨ Username '%s' is now available (stale client removed)\n", username)
+				return true
+			}
 		}
 	}
 
+	// Username not found in active clients
 	return true
 }
 
@@ -261,38 +278,104 @@ func (m *ConnectionModule) sendUsernameResponse(conn net.PacketConn, addr net.Ad
 }
 
 func (m *ConnectionModule) tryRestoreClient(username, sessionToken string, addr net.Addr) *ClientInfo {
-	disconnectedClientsMu.Lock()
-	defer disconnectedClientsMu.Unlock()
-
-	for i, client := range disconnectedClients {
-		if client.PublicID == username && client.SessionToken == sessionToken {
-			// Remove from disconnected list
-			disconnectedClients = append(disconnectedClients[:i], disconnectedClients[i+1:]...)
-
-			// Update address and add back to active clients
-			client.Address = addr
-			client.LastHeartbeat = time.Now()
-
-			allClientsMu.Lock()
-			allClients[client.PrivateID] = client
-			allClientsMu.Unlock()
-
-			return client
-		}
-	}
-
-	return nil
-}
-
-func (m *ConnectionModule) removeDisconnectedClientByUsername(username string) {
-	disconnectedClientsMu.Lock()
-	defer disconnectedClientsMu.Unlock()
+	// For reconnection, we need to be more careful about preserving position and lobby state
+	allClientsMu.Lock()
+	defer allClientsMu.Unlock()
 
 	usernameLower := strings.ToLower(username)
-	for i, client := range disconnectedClients {
+	now := time.Now()
+
+	// First, save any existing position data for this username
+	var savedPosition *LobbyPosition
+	var hadLobbyState bool
+
+	allClientsLobbyPosMu.RLock()
+	if pos, exists := allClientsLobbyPos[username]; exists {
+		savedPosition = &LobbyPosition{X: pos.X, Y: pos.Y, Z: pos.Z}
+		hadLobbyState = true
+		fmt.Printf("💾 Found saved position for %s: (%.2f, %.2f, %.2f)\n", username, pos.X, pos.Y, pos.Z)
+	}
+	allClientsLobbyPosMu.RUnlock()
+
+	// Check if there's an existing client with this username
+	for privateID, client := range allClients {
 		if strings.ToLower(client.PublicID) == usernameLower {
-			disconnectedClients = append(disconnectedClients[:i], disconnectedClients[i+1:]...)
-			break
+			// If it's the same session trying to reconnect, allow it
+			if client.SessionToken == sessionToken {
+				// Update address and heartbeat but preserve all other data
+				client.Address = addr
+				client.LastHeartbeat = now
+				fmt.Printf("🔄 Same session reconnecting: %s (preserving state)\n", username)
+				return client
+			}
+
+			// Different session - check if existing client is stale
+			if now.Sub(client.LastHeartbeat) >= 10*time.Second {
+				// Save color and lobby state before removing stale client
+				savedColor := client.ColorHex
+				wasInLobby := client.InLobby
+
+				// Remove stale client but don't clean up position data yet
+				delete(allClients, privateID)
+				fmt.Printf("🗑️ Removed stale client for reconnection: %s (preserving position data)\n", username)
+
+				// Create new client with preserved data
+				newPrivateID := generatePrivateID()
+				newSessionToken := generateSessionToken()
+
+				newClient := &ClientInfo{
+					PrivateID:     newPrivateID,
+					PublicID:      username,
+					Name:          username,
+					Address:       addr,
+					LastHeartbeat: now,
+					ConnectedAt:   now,
+					SessionToken:  newSessionToken,
+					ColorHex:      savedColor, // Preserve color
+					InLobby:       wasInLobby, // Preserve lobby state
+				}
+
+				allClients[newPrivateID] = newClient
+
+				// Position data is already preserved in allClientsLobbyPos map
+				if savedPosition != nil {
+					fmt.Printf("🎨 Restored client %s with color %s and position (%.2f, %.2f, %.2f)\n",
+						username, savedColor, savedPosition.X, savedPosition.Y, savedPosition.Z)
+				}
+
+				return newClient
+			} else {
+				// Active client with different session - deny reconnection
+				fmt.Printf("❌ Reconnection denied - username taken by active client: %s\n", username)
+				return nil
+			}
 		}
 	}
+
+	// No conflicting client found - create new client for reconnection
+	// This handles case where client was properly cleaned up but position data remains
+	privateID := generatePrivateID()
+	sessionTokenNew := generateSessionToken()
+
+	client := &ClientInfo{
+		PrivateID:     privateID,
+		PublicID:      username,
+		Name:          username,
+		Address:       addr,
+		LastHeartbeat: now,
+		ConnectedAt:   now,
+		SessionToken:  sessionTokenNew,
+		InLobby:       hadLobbyState, // Restore lobby state if position existed
+	}
+
+	allClients[privateID] = client
+
+	if savedPosition != nil {
+		fmt.Printf("✅ Created new client for reconnection: %s with restored position (%.2f, %.2f, %.2f)\n",
+			username, savedPosition.X, savedPosition.Y, savedPosition.Z)
+	} else {
+		fmt.Printf("✅ Created new client for reconnection: %s (no previous position)\n", username)
+	}
+
+	return client
 }

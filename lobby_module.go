@@ -39,9 +39,24 @@ func (m *LobbyModule) Handle(conn net.PacketConn, addr net.Addr, pkt *gamepacket
 
 	lobby.Colorhex = joiningClient.ColorHex
 
-	fmt.Printf("🎨 %s joined lobby with color %s (now in lobby)\n", lobby.PublicId, lobby.Colorhex)
+	// Check if client has existing position (reconnection case)
+	allClientsLobbyPosMu.RLock()
+	existingPosition, hasExistingPosition := allClientsLobbyPos[joiningClient.PublicID]
+	allClientsLobbyPosMu.RUnlock()
 
-	position := generateUniquePosition(joiningClient.PublicID)
+	var position LobbyPosition
+	if hasExistingPosition {
+		// Use existing position (reconnection)
+		position = existingPosition
+		fmt.Printf("🔄 Restoring %s to previous position (%.2f, %.2f, %.2f)\n",
+			joiningClient.PublicID, position.X, position.Y, position.Z)
+	} else {
+		// Generate new position (first time join)
+		position = generateUniquePosition(joiningClient.PublicID)
+		fmt.Printf("🎨 %s joined lobby with new position (%.2f, %.2f, %.2f)\n",
+			joiningClient.PublicID, position.X, position.Y, position.Z)
+	}
+
 	lobby.Position = &gamepacket.ClientLobbyPosition{
 		Position: &gamepacket.Position{
 			X: position.X,

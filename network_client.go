@@ -8,9 +8,48 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/protobuf/proto"
+)
+
+type ClientInfo struct {
+	PrivateID     string
+	PublicID      string
+	Name          string
+	Address       net.Addr
+	LastHeartbeat time.Time
+	ConnectedAt   time.Time
+	ColorHex      string
+	SessionToken  string
+	InLobby       bool
+}
+
+var (
+	allClients   = make(map[string]*ClientInfo) // Key: privateID
+	allClientsMu sync.RWMutex
+)
+
+type PendingClient struct {
+	TempID    string
+	Address   net.Addr
+	CreatedAt time.Time
+}
+
+var (
+	pendingClients   = make(map[string]*PendingClient) // Key: tempID
+	pendingClientsMu sync.RWMutex
+	pendingTimeout   = 30 * time.Second // Time to submit username
+)
+
+type LobbyPosition struct {
+	X, Y, Z float64
+}
+
+var (
+	allClientsLobbyPos   = make(map[string]LobbyPosition)
+	allClientsLobbyPosMu sync.RWMutex
 )
 
 var (
@@ -27,17 +66,35 @@ func broadcastToAll(conn net.PacketConn, packet *gamepacket.GamePacket, excludeP
 	}
 
 	allClientsMu.RLock()
-	defer allClientsMu.RUnlock()
 
-	sentCount := 0
+	// Collect target clients
+	var targets []*ClientInfo
 	for privateID, client := range allClients {
 		if privateID != excludePrivateID {
-			if _, err := conn.WriteTo(data, client.Address); err == nil {
-				sentCount++
-			}
+			targets = append(targets, client)
 		}
 	}
+	allClientsMu.RUnlock()
 
+	if len(targets) == 0 {
+		return
+	}
+
+	var wg sync.WaitGroup
+	sentCount := int32(0)
+
+	// Send to each client concurrently
+	for _, client := range targets {
+		wg.Add(1)
+		go func(c *ClientInfo) {
+			defer wg.Done()
+			if _, err := conn.WriteTo(data, c.Address); err == nil {
+				atomic.AddInt32(&sentCount, 1)
+			}
+		}(client)
+	}
+
+	wg.Wait()
 	fmt.Printf("📡 Broadcast sent to %d clients\n", sentCount)
 }
 
@@ -55,7 +112,7 @@ func addClient(privateID, publicID, name string, addr net.Addr) {
 		LastHeartbeat: time.Now(),
 		ConnectedAt:   time.Now(),
 		SessionToken:  sessionToken,
-		InLobby:       false, // Initially not in lobby
+		InLobby:       false,
 	}
 
 	fmt.Printf("✅ Client connected: %s from %s\n", publicID, addr)
@@ -72,58 +129,29 @@ func removeClient(conn net.PacketConn, privateID string) *ClientInfo {
 	delete(allClients, privateID)
 	allClientsMu.Unlock()
 
-	// Different behavior based on lobby status
+	// Clean up client data immediately - no more disconnected clients system
+	cleanupClientData(client)
+
+	// Broadcast player left if they were in lobby
 	if client.InLobby {
-		// Client was in lobby - wait 7 seconds for potential reconnection
-		client.DisconnectedAt = time.Now()
-
-		disconnectedClientsMu.Lock()
-		disconnectedClients = append(disconnectedClients, client)
-		disconnectedClientsMu.Unlock()
-
-		fmt.Printf("🔄 Lobby client %s moved to disconnected list (reconnection window: %.0fs)\n",
-			client.PublicID, reconnectionWindow.Seconds())
-
-		// Wait for potential reconnection
-		go func() {
-			time.Sleep(reconnectionWindow)
-			if !checkAndCleanupDisconnectedClient(client) {
-				// Client didn't reconnect, broadcast leave and cleanup
-				broadcastPlayerLeft(conn, client)
-				cleanupClientData(client)
-				fmt.Printf("❌ Lobby client %s permanently disconnected (session expired)\n", client.PublicID)
-			}
-		}()
-	} else {
-		// Client was not in lobby (only completed username) - immediate cleanup
-		cleanupClientData(client)
-		fmt.Printf("❌ Pre-lobby client disconnected: %s (%s) - immediate cleanup\n", client.Name, client.PublicID)
+		broadcastPlayerLeft(conn, client)
 	}
 
+	fmt.Printf("❌ Client disconnected: %s (%s) - immediate cleanup\n", client.Name, client.PublicID)
 	return client
 }
 
-func checkAndCleanupDisconnectedClient(client *ClientInfo) bool {
-	disconnectedClientsMu.Lock()
-	defer disconnectedClientsMu.Unlock()
-
-	// Check if client is still in disconnected list (not reconnected)
-	for i, dc := range disconnectedClients {
-		if dc.PrivateID == client.PrivateID {
-			// Remove from disconnected list
-			disconnectedClients = append(disconnectedClients[:i], disconnectedClients[i+1:]...)
-			return false // Client didn't reconnect
-		}
-	}
-
-	return true // Client already reconnected
-}
-
 func cleanupClientData(client *ClientInfo) {
-	// Clean up lobby position
-	allClientsLobbyPosMu.Lock()
-	delete(allClientsLobbyPos, client.PublicID)
-	allClientsLobbyPosMu.Unlock()
+	// Clean up lobby position ONLY if client wasn't in lobby
+	// This preserves position for reconnection if they were in lobby
+	if !client.InLobby {
+		allClientsLobbyPosMu.Lock()
+		delete(allClientsLobbyPos, client.PublicID)
+		allClientsLobbyPosMu.Unlock()
+		fmt.Printf("🗑️ Cleaned up position data for %s (wasn't in lobby)\n", client.PublicID)
+	} else {
+		fmt.Printf("💾 Preserving position data for %s (was in lobby)\n", client.PublicID)
+	}
 
 	// Clean up ID mappings
 	cleanupClientIDs(client.PrivateID, client.PublicID)
@@ -154,7 +182,7 @@ func startHeartbeatChecker(conn net.PacketConn) {
 			// Check for timed out active clients
 			allClientsMu.RLock()
 			for privateID, client := range allClients {
-				if now.Sub(client.LastHeartbeat) > 10*time.Second {
+				if now.Sub(client.LastHeartbeat) > 15*time.Second {
 					toRemove = append(toRemove, privateID)
 				}
 			}
@@ -168,34 +196,12 @@ func startHeartbeatChecker(conn net.PacketConn) {
 			// Clean up expired pending clients (those who never submitted username)
 			cleanupExpiredPendingClients()
 
-			// Clean up expired disconnected clients
-			cleanupExpiredDisconnectedClients()
-
 			if len(toRemove) > 0 {
-				fmt.Printf("🔄 Removed %d timed out clients. Active: %d, Pending: %d, Disconnected: %d\n",
-					len(toRemove), getClientCount(), getPendingClientCount(), getDisconnectedClientCount())
+				fmt.Printf("🔄 Removed %d timed out clients. Active: %d, Pending: %d\n",
+					len(toRemove), getClientCount(), getPendingClientCount())
 			}
 		}
 	}()
-}
-
-func cleanupExpiredDisconnectedClients() {
-	disconnectedClientsMu.Lock()
-	defer disconnectedClientsMu.Unlock()
-
-	now := time.Now()
-	var stillWaiting []*ClientInfo
-
-	for _, client := range disconnectedClients {
-		if now.Sub(client.DisconnectedAt) < reconnectionWindow {
-			stillWaiting = append(stillWaiting, client)
-		} else {
-			// ✅ Ensure complete cleanup
-			cleanupClientData(client)
-			fmt.Printf("🗑️ Cleaned up expired session: %s\n", client.PublicID)
-		}
-	}
-	disconnectedClients = stillWaiting
 }
 
 func broadcastPlayerLeft(conn net.PacketConn, leftClient *ClientInfo) {
@@ -221,12 +227,6 @@ func getClientCount() int {
 	allClientsMu.RLock()
 	defer allClientsMu.RUnlock()
 	return len(allClients)
-}
-
-func getDisconnectedClientCount() int {
-	disconnectedClientsMu.RLock()
-	defer disconnectedClientsMu.RUnlock()
-	return len(disconnectedClients)
 }
 
 func generateSecureDigits(n int) string {
@@ -265,4 +265,66 @@ func cleanupClientIDs(privateID, publicID string) {
 
 	delete(privateIDStore, strings.ToLower(privateID))
 	delete(publicIDStore, strings.ToLower(publicID))
+}
+
+func addPendingClient(tempID string, addr net.Addr) {
+	pendingClientsMu.Lock()
+	defer pendingClientsMu.Unlock()
+
+	pendingClients[tempID] = &PendingClient{
+		TempID:    tempID,
+		Address:   addr,
+		CreatedAt: time.Now(),
+	}
+
+	fmt.Printf("📝 Added pending client %s from %s\n", tempID, addr)
+}
+
+func removePendingClient(addr net.Addr) {
+	pendingClientsMu.Lock()
+	defer pendingClientsMu.Unlock()
+
+	// Find and remove pending client by address
+	for tempID, client := range pendingClients {
+		if client.Address.String() == addr.String() {
+			delete(pendingClients, tempID)
+			fmt.Printf("📝 Removed pending client %s from %s\n", tempID, addr)
+			return
+		}
+	}
+}
+
+func generateTempID() string {
+	return fmt.Sprintf("temp_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
+}
+
+// Cleanup expired pending clients
+func cleanupExpiredPendingClients() {
+	pendingClientsMu.Lock()
+	defer pendingClientsMu.Unlock()
+
+	now := time.Now()
+	var toRemove []string
+
+	for tempID, client := range pendingClients {
+		if now.Sub(client.CreatedAt) > pendingTimeout {
+			toRemove = append(toRemove, tempID)
+		}
+	}
+
+	for _, tempID := range toRemove {
+		client := pendingClients[tempID]
+		delete(pendingClients, tempID)
+		fmt.Printf("⏰ Removed expired pending client %s from %s\n", tempID, client.Address)
+	}
+
+	if len(toRemove) > 0 {
+		fmt.Printf("🗑️ Cleaned up %d expired pending clients\n", len(toRemove))
+	}
+}
+
+func getPendingClientCount() int {
+	pendingClientsMu.RLock()
+	defer pendingClientsMu.RUnlock()
+	return len(pendingClients)
 }
