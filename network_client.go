@@ -115,50 +115,81 @@ func addClient(privateID, publicID, name string, addr net.Addr) {
 		InLobby:       false,
 	}
 
-	fmt.Printf("✅ Client connected: %s from %s\n", publicID, addr)
+	fmt.Printf("✅ Client :=> %s connected from %s\n", publicID, addr)
 }
 
 func removeClient(conn net.PacketConn, privateID string) *ClientInfo {
+	client := getAndRemoveClient(privateID)
+	if client == nil {
+		return nil
+	}
+
+	cleanupClientData(client)
+	cleanupIDMappings(client)
+
+	if client.wasInLobby() {
+		broadcastPlayerLeft(conn, client)
+	}
+
+	logDisconnection(client)
+	return client
+}
+
+// Helper functions for better readability
+
+func getAndRemoveClient(privateID string) *ClientInfo {
 	allClientsMu.Lock()
+	defer allClientsMu.Unlock()
+
 	client, exists := allClients[privateID]
 	if !exists {
-		allClientsMu.Unlock()
 		return nil
 	}
 
 	delete(allClients, privateID)
-	allClientsMu.Unlock()
-
-	// Clean up client data immediately - no more disconnected clients system
-	cleanupClientData(client)
-
-	// Broadcast player left if they were in lobby
-	if client.InLobby {
-		broadcastPlayerLeft(conn, client)
-	}
-
-	fmt.Printf("❌ Client disconnected: %s (%s) - immediate cleanup\n", client.Name, client.PublicID)
 	return client
 }
 
 func cleanupClientData(client *ClientInfo) {
-	// Clean up lobby position ONLY if client wasn't in lobby
-	// This preserves position for reconnection if they were in lobby
-	if !client.InLobby {
-		allClientsLobbyPosMu.Lock()
-		delete(allClientsLobbyPos, client.PublicID)
-		allClientsLobbyPosMu.Unlock()
-		fmt.Printf("🗑️ Cleaned up position data for %s (wasn't in lobby)\n", client.PublicID)
-	} else {
+	if client.InLobby {
 		fmt.Printf("💾 Preserving position data for %s (was in lobby)\n", client.PublicID)
+		return
 	}
 
-	// Clean up ID mappings
-	cleanupClientIDs(client.PrivateID, client.PublicID)
+	allClientsLobbyPosMu.Lock()
+	delete(allClientsLobbyPos, client.PublicID)
+	allClientsLobbyPosMu.Unlock()
+
+	fmt.Printf("🗑️ Cleaned up position data for %s (wasn't in lobby)\n", client.PublicID)
 }
 
-func generateSessionToken() string {
-	return fmt.Sprintf("sess_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
+func cleanupIDMappings(client *ClientInfo) {
+	idMutex.Lock()
+	defer idMutex.Unlock()
+
+	delete(privateIDStore, strings.ToLower(client.PrivateID))
+	delete(publicIDStore, strings.ToLower(client.PublicID))
+}
+
+func (c *ClientInfo) wasInLobby() bool {
+	return c.InLobby && c.ColorHex != ""
+}
+
+func broadcastPlayerLeft(conn net.PacketConn, client *ClientInfo) {
+	leavePacket := &gamepacket.GamePacket{
+		Seq: uint32(rand.Intn(10000)),
+		ServerStatus: &gamepacket.ServerStatus{
+			Message:  fmt.Sprintf("Player %s left the lobby", client.PublicID),
+			ClientId: client.PublicID,
+		},
+	}
+
+	broadcastToAll(conn, leavePacket, client.PrivateID)
+	fmt.Printf("📤 Broadcast: %s left the lobby\n", client.PublicID)
+}
+
+func logDisconnection(client *ClientInfo) {
+	fmt.Printf("❌ Client disconnected: %s (%s)\n", client.Name, client.PublicID)
 }
 
 func updateHeartbeat(privateID string) bool {
@@ -182,18 +213,27 @@ func startHeartbeatChecker(conn net.PacketConn) {
 			// Check for timed out active clients
 			allClientsMu.RLock()
 			for privateID, client := range allClients {
-				if now.Sub(client.LastHeartbeat) > 15*time.Second {
+				//wait 7s for disconnected client before removing from allClients map
+				if now.Sub(client.LastHeartbeat) > 7*time.Second {
 					toRemove = append(toRemove, privateID)
 				}
 			}
 			allClientsMu.RUnlock()
 
-			// Remove timed out clients
-			for _, privateID := range toRemove {
-				removeClient(conn, privateID)
+			// Remove timed out clients concurrently
+			if len(toRemove) > 0 {
+				var wg sync.WaitGroup
+				for _, privateID := range toRemove {
+					wg.Add(1)
+					go func(id string) {
+						defer wg.Done()
+						removeClient(conn, id)
+					}(privateID)
+				}
+				wg.Wait()
 			}
 
-			// Clean up expired pending clients (those who never submitted username)
+			// Clean up expired pending clients
 			cleanupExpiredPendingClients()
 
 			if len(toRemove) > 0 {
@@ -202,69 +242,6 @@ func startHeartbeatChecker(conn net.PacketConn) {
 			}
 		}
 	}()
-}
-
-func broadcastPlayerLeft(conn net.PacketConn, leftClient *ClientInfo) {
-	if leftClient.ColorHex == "" {
-		return
-	}
-
-	leaveMessage := fmt.Sprintf("Player %s left the lobby", leftClient.PublicID)
-
-	leavePacket := &gamepacket.GamePacket{
-		Seq: uint32(rand.Intn(10000)),
-		ServerStatus: &gamepacket.ServerStatus{
-			Message:  leaveMessage,
-			ClientId: leftClient.PublicID,
-		},
-	}
-
-	broadcastToAll(conn, leavePacket, leftClient.PrivateID)
-	fmt.Printf("📤 Broadcast: %s left the lobby\n", leftClient.PublicID)
-}
-
-func getClientCount() int {
-	allClientsMu.RLock()
-	defer allClientsMu.RUnlock()
-	return len(allClients)
-}
-
-func generateSecureDigits(n int) string {
-	b := make([]byte, n)
-	crand.Read(b)
-	for i := range b {
-		b[i] = '0' + (b[i] % 10)
-	}
-	return string(b)
-}
-
-func generateUniqueID(prefix string, store map[string]struct{}) string {
-	for {
-		id := fmt.Sprintf("%s%s", prefix, generateSecureDigits(6))
-		idlower := strings.ToLower(id)
-
-		idMutex.Lock()
-		_, exists := store[idlower]
-
-		if !exists {
-			store[idlower] = struct{}{}
-			idMutex.Unlock()
-			return id
-		}
-		idMutex.Unlock()
-	}
-}
-
-func generatePrivateID() string {
-	return generateUniqueID("Client_", privateIDStore)
-}
-
-func cleanupClientIDs(privateID, publicID string) {
-	idMutex.Lock()
-	defer idMutex.Unlock()
-
-	delete(privateIDStore, strings.ToLower(privateID))
-	delete(publicIDStore, strings.ToLower(publicID))
 }
 
 func addPendingClient(tempID string, addr net.Addr) {
@@ -294,11 +271,6 @@ func removePendingClient(addr net.Addr) {
 	}
 }
 
-func generateTempID() string {
-	return fmt.Sprintf("temp_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
-}
-
-// Cleanup expired pending clients
 func cleanupExpiredPendingClients() {
 	pendingClientsMu.Lock()
 	defer pendingClientsMu.Unlock()
@@ -327,4 +299,48 @@ func getPendingClientCount() int {
 	pendingClientsMu.RLock()
 	defer pendingClientsMu.RUnlock()
 	return len(pendingClients)
+}
+
+func getClientCount() int {
+	allClientsMu.RLock()
+	defer allClientsMu.RUnlock()
+	return len(allClients)
+}
+
+func generateSessionToken() string {
+	return fmt.Sprintf("sess_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
+}
+
+func generateSecureDigits(n int) string {
+	b := make([]byte, n)
+	crand.Read(b)
+	for i := range b {
+		b[i] = '0' + (b[i] % 10)
+	}
+	return string(b)
+}
+
+func generatePrivateID() string {
+	return generateUniqueID("Client_", privateIDStore)
+}
+
+func generateUniqueID(prefix string, store map[string]struct{}) string {
+	for {
+		id := fmt.Sprintf("%s%s", prefix, generateSecureDigits(6))
+		idlower := strings.ToLower(id)
+
+		idMutex.Lock()
+		_, exists := store[idlower]
+
+		if !exists {
+			store[idlower] = struct{}{}
+			idMutex.Unlock()
+			return id
+		}
+		idMutex.Unlock()
+	}
+}
+
+func generateTempID() string {
+	return fmt.Sprintf("temp_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
 }

@@ -41,7 +41,6 @@ message UsernameResponse {
   string username = 1;
   bool isAccepted = 2;
   string message = 3;
-  repeated string suggestions = 4;
 }
 
 message ReconnectionRequest {

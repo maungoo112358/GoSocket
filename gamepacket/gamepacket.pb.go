@@ -358,7 +358,6 @@ type UsernameResponse struct {
 	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
 	IsAccepted    bool                   `protobuf:"varint,2,opt,name=isAccepted,proto3" json:"isAccepted,omitempty"`
 	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
-	Suggestions   []string               `protobuf:"bytes,4,rep,name=suggestions,proto3" json:"suggestions,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -412,13 +411,6 @@ func (x *UsernameResponse) GetMessage() string {
 		return x.Message
 	}
 	return ""
-}
-
-func (x *UsernameResponse) GetSuggestions() []string {
-	if x != nil {
-		return x.Suggestions
-	}
-	return nil
 }
 
 type ReconnectionRequest struct {
@@ -1014,14 +1006,13 @@ const file_gamepacket_proto_rawDesc = "" +
 	"\x0eUsernamePrompt\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"0\n" +
 	"\x12UsernameSubmission\x12\x1a\n" +
-	"\busername\x18\x01 \x01(\tR\busername\"\x8a\x01\n" +
+	"\busername\x18\x01 \x01(\tR\busername\"h\n" +
 	"\x10UsernameResponse\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x1e\n" +
 	"\n" +
 	"isAccepted\x18\x02 \x01(\bR\n" +
 	"isAccepted\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\x12 \n" +
-	"\vsuggestions\x18\x04 \x03(\tR\vsuggestions\"U\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"U\n" +
 	"\x13ReconnectionRequest\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\"\n" +
 	"\fsessionToken\x18\x02 \x01(\tR\fsessionToken\"\x8e\x01\n" +
