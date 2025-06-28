@@ -23,6 +23,12 @@ const (
 	MaxPendingMovements = 100 // Max queued movements per client
 )
 
+const (
+	// Collision detection settings
+	PlayerRadius      = 0.5  // Each player occupies 0.1 unit radius
+	CollisionGridSize = 10.0 // 10x10 unit grid for collision checking
+)
+
 type MovementModule struct {
 	name        string
 	rateLimiter *MovementRateLimiter
@@ -47,57 +53,137 @@ func (m *MovementModule) GetName() string {
 	return m.name
 }
 
-// CanHandle determines if this module can process the packet
 func (m *MovementModule) CanHandle(pkt *gamepacket.GamePacket) bool {
 	return pkt.GetClientPosition() != nil
 }
 
-// Handle processes client movement packets
 func (m *MovementModule) Handle(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) {
 	clientPos := pkt.GetClientPosition()
 	if clientPos == nil {
 		return
 	}
 
-	// Validate the movement packet
-	if !m.validateMovementPacket(clientPos, addr) {
-		return
-	}
-
-	// Check rate limiting
 	if !m.checkRateLimit(clientPos.ClientId) {
 		fmt.Printf("⚠️ Rate limit exceeded for client %s\n", clientPos.ClientId)
 		return
 	}
 
-	// Update timestamp and broadcast
+	if !m.validateMovementPacket(clientPos, addr) {
+		// Movement rejected - broadcast current position to ALL clients
+		m.broadcastCurrentPosition(conn, clientPos.ClientId, pkt.Seq)
+		return
+	}
+
 	m.processMovement(conn, clientPos)
 }
 
 // === Movement Validation ===
-
 func (m *MovementModule) validateMovementPacket(clientPos *gamepacket.ClientPosition, addr net.Addr) bool {
-	// Check if client exists and is active
+
 	if !m.isValidClient(clientPos.ClientId) {
 		fmt.Printf("⚠️ Movement from unknown/inactive client: %s from %s\n",
 			clientPos.ClientId, addr)
 		return false
 	}
 
-	// Validate position bounds
 	if !m.isValidPosition(clientPos.Position) {
 		fmt.Printf("⚠️ Invalid position from %s: %.2f,%.2f,%.2f\n",
 			clientPos.ClientId, clientPos.Position.X, clientPos.Position.Y, clientPos.Position.Z)
 		return false
 	}
 
-	// Check for reasonable movement (optional anti-cheat)
-	if !m.isReasonableMovement(clientPos) {
-		fmt.Printf("⚠️ Suspicious movement from %s: teleport detected\n", clientPos.ClientId)
-		// For now, just log - could implement stricter validation
+	if m.checkPlayerCollisions(clientPos.ClientId, clientPos.Position) {
+		fmt.Printf("🚫 Movement rejected due to collision: %s\n", clientPos.ClientId)
+		return false
 	}
 
 	return true
+}
+
+func (m *MovementModule) checkPlayerCollisions(clientID string, newPos *gamepacket.Position) bool {
+	allPositions := GetAllLobbyPositions()
+
+	logFlag := false
+	playersInGrid := m.getPlayersInGrid(newPos, allPositions, clientID, &logFlag)
+
+	for playerID, playerPos := range playersInGrid {
+		if m.hasCollision(newPos, playerPos) {
+			fmt.Printf("🚫 Collision detected: %s would collide with %s\n", clientID, playerID)
+			return true
+		}
+	}
+
+	return false
+}
+
+func (m *MovementModule) getPlayersInGrid(centerPos *gamepacket.Position, allPositions map[string]LobbyPosition, excludeClientID string, isLog *bool) map[string]LobbyPosition {
+	gridHalfSize := CollisionGridSize / 2.0
+	gridMinX := centerPos.X - gridHalfSize
+	gridMaxX := centerPos.X + gridHalfSize
+	gridMinZ := centerPos.Z - gridHalfSize
+	gridMaxZ := centerPos.Z + gridHalfSize
+
+	playersInGrid := make(map[string]LobbyPosition)
+
+	for playerID, playerPos := range allPositions {
+		// Skip the moving client
+		if playerID == excludeClientID {
+			continue
+		}
+
+		// Check if player is within grid bounds
+		if m.isPositionInGrid(playerPos, gridMinX, gridMaxX, gridMinZ, gridMaxZ) {
+			playersInGrid[playerID] = playerPos
+		}
+	}
+
+	shouldLog := true
+	if isLog != nil {
+		shouldLog = *isLog
+	}
+	if shouldLog {
+		fmt.Printf("🔍 Checking collision for %s: %d players in grid\n", excludeClientID, len(playersInGrid))
+	}
+
+	return playersInGrid
+}
+
+func (m *MovementModule) isPositionInGrid(pos LobbyPosition, minX, maxX, minZ, maxZ float64) bool {
+	return pos.X >= minX && pos.X <= maxX && pos.Z >= minZ && pos.Z <= maxZ
+}
+
+func (m *MovementModule) hasCollision(pos1 *gamepacket.Position, pos2 LobbyPosition) bool {
+	// Calculate distance on XZ plane (ignore Y for ground-based collision)
+	dx := pos1.X - pos2.X
+	dz := pos1.Z - pos2.Z
+	distance := math.Sqrt(dx*dx + dz*dz)
+
+	minDistance := PlayerRadius + PlayerRadius
+	return distance < minDistance
+}
+
+func (m *MovementModule) broadcastCurrentPosition(conn net.PacketConn, clientID string, seq uint32) {
+	currentPos, exists := GetLobbyPosition(clientID)
+	if !exists {
+		fmt.Printf("⚠️ Cannot broadcast position - no position found for %s\n", clientID)
+		return
+	}
+
+	correctionPacket := &gamepacket.GamePacket{
+		Seq: seq,
+		ClientPosition: &gamepacket.ClientPosition{
+			ClientId: clientID,
+			Position: &gamepacket.Position{
+				X: currentPos.X,
+				Y: currentPos.Y,
+				Z: currentPos.Z,
+			},
+			Timestamp: float32(time.Now().UnixMilli()) / 1000.0,
+		},
+	}
+
+	BroadcastToAll(conn, correctionPacket, "")
+	fmt.Printf("🚫 Collision rejected: broadcasted current position for %s to all clients\n", clientID)
 }
 
 func (m *MovementModule) isValidClient(clientID string) bool {
@@ -115,55 +201,36 @@ func (m *MovementModule) isValidPosition(pos *gamepacket.Position) bool {
 		pos.Z >= MinPositionZ && pos.Z <= MaxPositionZ
 }
 
-func (m *MovementModule) isReasonableMovement(clientPos *gamepacket.ClientPosition) bool {
-	// TODO: Implement movement validation based on previous position and time
-	// For now, always return true
-	// Could check:
-	// - Maximum speed between updates
-	// - Physics constraints (can't move through walls)
-	// - Teleport detection
-	return true
-}
-
 // === Rate Limiting ===
 
 func (m *MovementModule) checkRateLimit(clientID string) bool {
 	now := time.Now()
 
-	// Clean up old entries periodically
 	m.cleanupRateLimitData(now)
 
-	// Check if client is within rate limits
 	lastSent, exists := m.rateLimiter.clientLastSent[clientID]
 	if !exists {
-		// First movement from this client
 		m.rateLimiter.clientLastSent[clientID] = now
 		m.rateLimiter.clientCounts[clientID] = 1
 		return true
 	}
 
-	// Check if we're in a new time window
 	if now.Sub(lastSent) >= MovementWindow {
-		// Reset counter for new window
 		m.rateLimiter.clientLastSent[clientID] = now
 		m.rateLimiter.clientCounts[clientID] = 1
 		return true
 	}
 
-	// Check if within rate limit for current window
 	currentCount := m.rateLimiter.clientCounts[clientID]
 	if float64(currentCount) >= MaxMovementRate {
-		return false // Rate limit exceeded
+		return false
 	}
 
-	// Update counter
 	m.rateLimiter.clientCounts[clientID] = currentCount + 1
 	return true
 }
 
 func (m *MovementModule) cleanupRateLimitData(now time.Time) {
-	// Only cleanup every 10 seconds to avoid overhead
-	// This is a simple approach - could be optimized with a proper cleanup schedule
 	for clientID, lastSent := range m.rateLimiter.clientLastSent {
 		if now.Sub(lastSent) > 10*time.Second {
 			delete(m.rateLimiter.clientLastSent, clientID)
@@ -175,18 +242,15 @@ func (m *MovementModule) cleanupRateLimitData(now time.Time) {
 // === Movement Processing ===
 
 func (m *MovementModule) processMovement(conn net.PacketConn, clientPos *gamepacket.ClientPosition) {
-	// Update timestamp to server time
 	clientPos.Timestamp = float32(time.Now().UnixMilli()) / 1000.0
 
-	// Update client's lobby position if they're in lobby
 	m.updateLobbyPosition(clientPos)
 
-	// Broadcast to other clients
 	m.broadcastMovement(conn, clientPos)
 }
 
 func (m *MovementModule) updateLobbyPosition(clientPos *gamepacket.ClientPosition) {
-	// Only update lobby position if client is in lobby
+
 	client := FindClientByPublicID(clientPos.ClientId)
 	if client != nil && client.InLobby {
 		newPos := LobbyPosition{
@@ -204,96 +268,6 @@ func (m *MovementModule) broadcastMovement(conn net.PacketConn, clientPos *gamep
 		ClientPosition: clientPos,
 	}
 
-	// Use the optimized broadcast function
-	BroadcastToAllExcept(conn, packet, clientPos.ClientId)
-
-	// Optional: Log movement for debugging (can be disabled in production)
-	if m.shouldLogMovement(clientPos.ClientId) {
-		fmt.Printf("📍 Movement: %s -> (%.1f, %.1f, %.1f)\n",
-			clientPos.ClientId, clientPos.Position.X, clientPos.Position.Y, clientPos.Position.Z)
-	}
-}
-
-func (m *MovementModule) shouldLogMovement(clientID string) bool {
-	// Only log movement occasionally to avoid spam
-	return false // Disabled by default
-}
-
-// === Statistics and Monitoring ===
-
-func (m *MovementModule) GetStats() MovementStats {
-	return MovementStats{
-		ActiveClients:   len(m.rateLimiter.clientLastSent),
-		TotalClients:    GetClientCount(),
-		RateLimitWindow: MovementWindow,
-		MaxRate:         MaxMovementRate,
-	}
-}
-
-type MovementStats struct {
-	ActiveClients   int
-	TotalClients    int
-	RateLimitWindow time.Duration
-	MaxRate         float64
-}
-
-func (stats MovementStats) String() string {
-	return fmt.Sprintf("Movement Stats: %d/%d clients active, max %.0f/sec",
-		stats.ActiveClients, stats.TotalClients, stats.MaxRate)
-}
-
-// === Advanced Features (Future) ===
-
-// MovementValidator interface for pluggable validation
-type MovementValidator interface {
-	ValidateMovement(prev, current *gamepacket.Position, deltaTime float64) bool
-}
-
-// PhysicsValidator implements basic physics-based movement validation
-type PhysicsValidator struct {
-	MaxSpeed float64 // units per second
-}
-
-func (pv *PhysicsValidator) ValidateMovement(prev, current *gamepacket.Position, deltaTime float64) bool {
-	if prev == nil || current == nil || deltaTime <= 0 {
-		return true // Can't validate
-	}
-
-	// Calculate distance moved
-	dx := current.X - prev.X
-	dy := current.Y - prev.Y
-	dz := current.Z - prev.Z
-	distance := math.Sqrt(dx*dx + dy*dy + dz*dz)
-
-	// Calculate speed
-	speed := distance / deltaTime
-
-	return speed <= pv.MaxSpeed
-}
-
-// Future: Could add more validators
-// - CollisionValidator: Check against world geometry
-// - TeleportValidator: Detect impossible position changes
-// - ZoneValidator: Ensure movement within allowed areas
-
-// === Cleanup and Maintenance ===
-
-func (m *MovementModule) Cleanup() {
-	// Clean up rate limiter data
-	now := time.Now()
-	m.cleanupRateLimitData(now)
-
-	fmt.Printf("🧹 Movement module cleanup completed\n")
-}
-
-// StartMaintenanceRoutine starts background cleanup
-func (m *MovementModule) StartMaintenanceRoutine() {
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-
-		for range ticker.C {
-			m.Cleanup()
-		}
-	}()
+	logFlag := false
+	BroadcastToAllExcept(conn, packet, clientPos.ClientId, &logFlag)
 }

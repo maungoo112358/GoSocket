@@ -24,12 +24,12 @@ func BroadcastToAll(conn net.PacketConn, packet *gamepacket.GamePacket, excludeP
 		return
 	}
 
-	sendConcurrently(conn, data, targets)
+	sendConcurrently(conn, data, targets, nil)
 }
 
 // BroadcastToAllExcept sends a packet to all clients except the one with given clientID
 // This is used for movement packets where clientID is the public ID
-func BroadcastToAllExcept(conn net.PacketConn, packet *gamepacket.GamePacket, excludeClientID string) {
+func BroadcastToAllExcept(conn net.PacketConn, packet *gamepacket.GamePacket, excludeClientID string, isLog *bool) {
 	data, err := proto.Marshal(packet)
 	if err != nil {
 		fmt.Printf("❌ Failed to marshal movement packet: %v\n", err)
@@ -41,7 +41,7 @@ func BroadcastToAllExcept(conn net.PacketConn, packet *gamepacket.GamePacket, ex
 		return
 	}
 
-	sendConcurrently(conn, data, targets)
+	sendConcurrently(conn, data, targets, isLog)
 }
 
 // SendToClient sends a packet to a specific client
@@ -87,7 +87,7 @@ func BroadcastToLobbyClients(conn net.PacketConn, packet *gamepacket.GamePacket,
 		return
 	}
 
-	sendConcurrently(conn, data, targets)
+	sendConcurrently(conn, data, targets, nil)
 	fmt.Printf("📡 Lobby broadcast sent to %d clients\n", len(targets))
 }
 
@@ -136,7 +136,7 @@ func getLobbyTargetClients(excludePrivateID string) []*ClientInfo {
 }
 
 // sendConcurrently sends data to multiple clients using goroutines
-func sendConcurrently(conn net.PacketConn, data []byte, targets []*ClientInfo) {
+func sendConcurrently(conn net.PacketConn, data []byte, targets []*ClientInfo, isLog *bool) {
 	var wg sync.WaitGroup
 	sentCount := int32(0)
 
@@ -154,9 +154,15 @@ func sendConcurrently(conn net.PacketConn, data []byte, targets []*ClientInfo) {
 	}
 
 	wg.Wait()
+	shouldLog := true
+	if isLog != nil {
+		shouldLog = *isLog
+	}
+	if shouldLog {
+		if len(targets) > 0 {
+			fmt.Printf("📡 Broadcast sent to %d/%d clients\n", sentCount, len(targets))
 
-	if len(targets) > 0 {
-		fmt.Printf("📡 Broadcast sent to %d/%d clients\n", sentCount, len(targets))
+		}
 	}
 }
 
@@ -189,16 +195,6 @@ func BroadcastPlayerJoined(conn net.PacketConn, joinedClient *ClientInfo, lobbyJ
 
 	BroadcastToAll(conn, packet, joinedClient.PrivateID)
 	fmt.Printf("📡 Player join broadcast: %s\n", joinedClient.PublicID)
-}
-
-// BroadcastMovement sends movement data to all clients except the moving client
-func BroadcastMovement(conn net.PacketConn, clientPos *gamepacket.ClientPosition) {
-	packet := &gamepacket.GamePacket{
-		Seq:            generateRandomSeq(),
-		ClientPosition: clientPos,
-	}
-
-	BroadcastToAllExcept(conn, packet, clientPos.ClientId)
 }
 
 // generateRandomSeq creates a random sequence number for packets
