@@ -5,6 +5,7 @@ import (
 	"gosocket/gamepacket"
 	"math"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -18,25 +19,42 @@ const (
 	MaxPositionZ = 1000.0
 
 	// Rate limiting
-	MaxMovementRate     = 60.0 // Max movements per second per client
+	MaxMovementRate     = 60.0
 	MovementWindow      = time.Second
-	MaxPendingMovements = 100 // Max queued movements per client
-)
+	MaxPendingMovements = 100
 
-const (
 	// Collision detection settings
-	PlayerRadius      = 0.5  // Each player occupies 0.1 unit radius
-	CollisionGridSize = 10.0 // 10x10 unit grid for collision checking
+	PlayerRadius      = 0.5
+	CollisionGridSize = 10.0
+
+	// Concurrency settings
+	MaxMovementWorkers = 10  // Number of concurrent movement processors
+	MovementBufferSize = 100 // Buffer size for movement queue
 )
 
 type MovementModule struct {
 	name        string
 	rateLimiter *MovementRateLimiter
+
+	// Concurrency components
+	movementQueue chan MovementRequest
+	workerPool    sync.WaitGroup
+	isRunning     bool
+	stopChan      chan struct{}
+	mu            sync.RWMutex // Protects shared state
+}
+
+type MovementRequest struct {
+	conn      net.PacketConn
+	addr      net.Addr
+	packet    *gamepacket.GamePacket
+	clientPos *gamepacket.ClientPosition
 }
 
 type MovementRateLimiter struct {
 	clientLastSent map[string]time.Time
 	clientCounts   map[string]int
+	mu             sync.RWMutex // Protects rate limiter maps
 }
 
 func NewMovementModule() *MovementModule {
@@ -46,6 +64,61 @@ func NewMovementModule() *MovementModule {
 			clientLastSent: make(map[string]time.Time),
 			clientCounts:   make(map[string]int),
 		},
+		movementQueue: make(chan MovementRequest, MovementBufferSize),
+		stopChan:      make(chan struct{}),
+		isRunning:     false,
+	}
+}
+
+func (m *MovementModule) StartWorkers() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.isRunning {
+		return
+	}
+
+	m.isRunning = true
+
+	// Start worker goroutines
+	for i := 0; i < MaxMovementWorkers; i++ {
+		m.workerPool.Add(1)
+		go m.movementWorker(i)
+	}
+
+	fmt.Printf("🚀 Started %d movement workers\n", MaxMovementWorkers)
+}
+
+func (m *MovementModule) StopWorkers() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if !m.isRunning {
+		return
+	}
+
+	m.isRunning = false
+	close(m.stopChan)
+
+	// Wait for all workers to finish
+	m.workerPool.Wait()
+
+	fmt.Println("🛑 All movement workers stopped")
+}
+
+func (m *MovementModule) movementWorker(workerID int) {
+	defer m.workerPool.Done()
+
+	fmt.Printf("🔧 Movement worker %d started\n", workerID)
+
+	for {
+		select {
+		case req := <-m.movementQueue:
+			m.processMovementRequest(req, workerID)
+		case <-m.stopChan:
+			fmt.Printf("🔧 Movement worker %d stopping\n", workerID)
+			return
+		}
 	}
 }
 
@@ -63,23 +136,41 @@ func (m *MovementModule) Handle(conn net.PacketConn, addr net.Addr, pkt *gamepac
 		return
 	}
 
+	req := MovementRequest{
+		conn:      conn,
+		addr:      addr,
+		packet:    pkt,
+		clientPos: clientPos,
+	}
+
+	// Queue for concurrent processing
+	select {
+	case m.movementQueue <- req:
+	default:
+		fmt.Printf("⚠️ Movement queue full, processing synchronously for %s\n", clientPos.ClientId)
+		m.processMovementRequest(req, -1) // -1 indicates synchronous processing
+	}
+}
+
+func (m *MovementModule) processMovementRequest(req MovementRequest, workerID int) {
+	clientPos := req.clientPos
+
 	if !m.checkRateLimit(clientPos.ClientId) {
-		fmt.Printf("⚠️ Rate limit exceeded for client %s\n", clientPos.ClientId)
+		fmt.Printf("⚠️ [Worker %d] Rate limit exceeded for client %s\n", workerID, clientPos.ClientId)
 		return
 	}
 
-	if !m.validateMovementPacket(clientPos, addr) {
+	if !m.validateMovementPacket(clientPos, req.addr) {
 		// Movement rejected - broadcast current position to ALL clients
-		m.broadcastCurrentPosition(conn, clientPos.ClientId, pkt.Seq)
+		m.broadcastCurrentPosition(req.conn, clientPos.ClientId, req.packet.Seq)
 		return
 	}
 
-	m.processMovement(conn, clientPos)
+	m.processMovement(req.conn, clientPos)
 }
 
 // === Movement Validation ===
 func (m *MovementModule) validateMovementPacket(clientPos *gamepacket.ClientPosition, addr net.Addr) bool {
-
 	if !m.isValidClient(clientPos.ClientId) {
 		fmt.Printf("⚠️ Movement from unknown/inactive client: %s from %s\n",
 			clientPos.ClientId, addr)
@@ -101,6 +192,7 @@ func (m *MovementModule) validateMovementPacket(clientPos *gamepacket.ClientPosi
 }
 
 func (m *MovementModule) checkPlayerCollisions(clientID string, newPos *gamepacket.Position) bool {
+	// Thread-safe access to lobby positions
 	allPositions := GetAllLobbyPositions()
 
 	logFlag := false
@@ -126,12 +218,10 @@ func (m *MovementModule) getPlayersInGrid(centerPos *gamepacket.Position, allPos
 	playersInGrid := make(map[string]LobbyPosition)
 
 	for playerID, playerPos := range allPositions {
-		// Skip the moving client
 		if playerID == excludeClientID {
 			continue
 		}
 
-		// Check if player is within grid bounds
 		if m.isPositionInGrid(playerPos, gridMinX, gridMaxX, gridMinZ, gridMaxZ) {
 			playersInGrid[playerID] = playerPos
 		}
@@ -153,7 +243,6 @@ func (m *MovementModule) isPositionInGrid(pos LobbyPosition, minX, maxX, minZ, m
 }
 
 func (m *MovementModule) hasCollision(pos1 *gamepacket.Position, pos2 LobbyPosition) bool {
-	// Calculate distance on XZ plane (ignore Y for ground-based collision)
 	dx := pos1.X - pos2.X
 	dz := pos1.Z - pos2.Z
 	distance := math.Sqrt(dx*dx + dz*dz)
@@ -202,10 +291,11 @@ func (m *MovementModule) isValidPosition(pos *gamepacket.Position) bool {
 }
 
 // === Rate Limiting ===
-
 func (m *MovementModule) checkRateLimit(clientID string) bool {
-	now := time.Now()
+	m.rateLimiter.mu.Lock()
+	defer m.rateLimiter.mu.Unlock()
 
+	now := time.Now()
 	m.cleanupRateLimitData(now)
 
 	lastSent, exists := m.rateLimiter.clientLastSent[clientID]
@@ -240,17 +330,14 @@ func (m *MovementModule) cleanupRateLimitData(now time.Time) {
 }
 
 // === Movement Processing ===
-
 func (m *MovementModule) processMovement(conn net.PacketConn, clientPos *gamepacket.ClientPosition) {
 	clientPos.Timestamp = float32(time.Now().UnixMilli()) / 1000.0
 
 	m.updateLobbyPosition(clientPos)
-
 	m.broadcastMovement(conn, clientPos)
 }
 
 func (m *MovementModule) updateLobbyPosition(clientPos *gamepacket.ClientPosition) {
-
 	client := FindClientByPublicID(clientPos.ClientId)
 	if client != nil && client.InLobby {
 		newPos := LobbyPosition{
@@ -270,4 +357,34 @@ func (m *MovementModule) broadcastMovement(conn net.PacketConn, clientPos *gamep
 
 	logFlag := false
 	BroadcastToAllExcept(conn, packet, clientPos.ClientId, &logFlag)
+}
+
+// === Statistics ===
+func (m *MovementModule) GetStats() MovementStats {
+	m.rateLimiter.mu.RLock()
+	activeClients := len(m.rateLimiter.clientLastSent)
+	m.rateLimiter.mu.RUnlock()
+
+	return MovementStats{
+		ActiveClients:   activeClients,
+		TotalClients:    GetClientCount(),
+		RateLimitWindow: MovementWindow,
+		MaxRate:         MaxMovementRate,
+		QueueSize:       len(m.movementQueue),
+		WorkerCount:     MaxMovementWorkers,
+	}
+}
+
+type MovementStats struct {
+	ActiveClients   int
+	TotalClients    int
+	RateLimitWindow time.Duration
+	MaxRate         float64
+	QueueSize       int
+	WorkerCount     int
+}
+
+func (stats MovementStats) String() string {
+	return fmt.Sprintf("Movement Stats: %d/%d clients active, max %.0f/sec, queue: %d, workers: %d",
+		stats.ActiveClients, stats.TotalClients, stats.MaxRate, stats.QueueSize, stats.WorkerCount)
 }

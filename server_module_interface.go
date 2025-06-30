@@ -14,11 +14,14 @@ type ServerModule interface {
 var modules []ServerModule
 
 func init() {
+	movementModule := NewMovementModule()
+
 	modules = []ServerModule{
 		NewConnectionModule(),
 		NewLobbyModule(),
-		NewMovementModule(),
+		movementModule,
 	}
+	movementModule.StartWorkers()
 }
 
 func dispatchPacket(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) {
@@ -29,4 +32,17 @@ func dispatchPacket(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePack
 		}
 	}
 	fmt.Println("⚠️ No module handled packet")
+}
+
+func shutdownModules() {
+	fmt.Println("🛑 Shutting down all modules...")
+
+	for _, module := range modules {
+		if movementModule, ok := module.(*MovementModule); ok {
+			fmt.Println("🛑 Stopping movement workers...")
+			movementModule.StopWorkers()
+		}
+	}
+
+	fmt.Println("✅ All modules shut down successfully")
 }

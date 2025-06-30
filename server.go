@@ -163,6 +163,9 @@ func (s *Server) SetupGracefulShutdown() {
 		<-signals
 		fmt.Println("🛑 Shutdown signal received...")
 		s.Shutdown()
+
+		shutdownModules()
+
 		s.cancel()
 	}()
 }
@@ -207,6 +210,9 @@ func (s *Server) StartHeartbeatChecker() {
 
 func (s *Server) Close() {
 	s.cancel()
+
+	shutdownModules()
+
 	if s.conn != nil {
 		s.conn.Close()
 	}
