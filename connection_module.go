@@ -17,6 +17,12 @@ const (
 type ConnectionModule struct{}
 
 func NewConnectionModule() *ConnectionModule {
+	RegisterModule(ModuleInfo{
+		Name:         ConnectionModuleEnum,
+		Type:         Critical,
+		Dependencies: []ModuleEnum{},
+		SubModules:   []ModuleEnum{},
+	})
 	return &ConnectionModule{}
 }
 

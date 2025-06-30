@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"gosocket/gamepacket"
-	"math"
 	"net"
 	"sync"
 	"time"
@@ -23,10 +22,6 @@ const (
 	MovementWindow      = time.Second
 	MaxPendingMovements = 100
 
-	// Collision detection settings
-	PlayerRadius      = 0.5
-	CollisionGridSize = 10.0
-
 	// Concurrency settings
 	MaxMovementWorkers = 10  // Number of concurrent movement processors
 	MovementBufferSize = 100 // Buffer size for movement queue
@@ -35,6 +30,8 @@ const (
 type MovementModule struct {
 	name        string
 	rateLimiter *MovementRateLimiter
+
+	collisionService CollisionService
 
 	// Concurrency components
 	movementQueue chan MovementRequest
@@ -58,8 +55,21 @@ type MovementRateLimiter struct {
 }
 
 func NewMovementModule() *MovementModule {
+	RegisterModule(ModuleInfo{
+		Name:         MovementModuleEnum,
+		Type:         NonCritical,
+		Dependencies: []ModuleEnum{},
+		SubModules:   []ModuleEnum{},
+	})
+
+	var collisionService CollisionService
+	if service := GetService(CollisionModuleEnum); service != nil {
+		collisionService = service.(CollisionService)
+	}
+
 	return &MovementModule{
-		name: "MovementModule",
+		name:             "MovementModule",
+		collisionService: collisionService,
 		rateLimiter: &MovementRateLimiter{
 			clientLastSent: make(map[string]time.Time),
 			clientCounts:   make(map[string]int),
@@ -160,9 +170,7 @@ func (m *MovementModule) processMovementRequest(req MovementRequest, workerID in
 		return
 	}
 
-	if !m.validateMovementPacket(clientPos, req.addr) {
-		// Movement rejected - broadcast current position to ALL clients
-		m.broadcastCurrentPosition(req.conn, clientPos.ClientId, req.packet.Seq)
+	if !m.validateMovementPacket(clientPos, req.addr, req) {
 		return
 	}
 
@@ -170,7 +178,7 @@ func (m *MovementModule) processMovementRequest(req MovementRequest, workerID in
 }
 
 // === Movement Validation ===
-func (m *MovementModule) validateMovementPacket(clientPos *gamepacket.ClientPosition, addr net.Addr) bool {
+func (m *MovementModule) validateMovementPacket(clientPos *gamepacket.ClientPosition, addr net.Addr, req MovementRequest) bool {
 	if !m.isValidClient(clientPos.ClientId) {
 		fmt.Printf("⚠️ Movement from unknown/inactive client: %s from %s\n",
 			clientPos.ClientId, addr)
@@ -183,96 +191,12 @@ func (m *MovementModule) validateMovementPacket(clientPos *gamepacket.ClientPosi
 		return false
 	}
 
-	if m.checkPlayerCollisions(clientPos.ClientId, clientPos.Position) {
-		fmt.Printf("🚫 Movement rejected due to collision: %s\n", clientPos.ClientId)
+	if m.collisionService != nil && m.collisionService.CheckPlayerCollision(clientPos.ClientId, clientPos.Position) {
+		m.collisionService.BroadcastRejection(req.conn, clientPos.ClientId, req.packet.Seq)
 		return false
 	}
 
 	return true
-}
-
-func (m *MovementModule) checkPlayerCollisions(clientID string, newPos *gamepacket.Position) bool {
-	// Thread-safe access to lobby positions
-	allPositions := GetAllLobbyPositions()
-
-	logFlag := false
-	playersInGrid := m.getPlayersInGrid(newPos, allPositions, clientID, &logFlag)
-
-	for playerID, playerPos := range playersInGrid {
-		if m.hasCollision(newPos, playerPos) {
-			fmt.Printf("🚫 Collision detected: %s would collide with %s\n", clientID, playerID)
-			return true
-		}
-	}
-
-	return false
-}
-
-func (m *MovementModule) getPlayersInGrid(centerPos *gamepacket.Position, allPositions map[string]LobbyPosition, excludeClientID string, isLog *bool) map[string]LobbyPosition {
-	gridHalfSize := CollisionGridSize / 2.0
-	gridMinX := centerPos.X - gridHalfSize
-	gridMaxX := centerPos.X + gridHalfSize
-	gridMinZ := centerPos.Z - gridHalfSize
-	gridMaxZ := centerPos.Z + gridHalfSize
-
-	playersInGrid := make(map[string]LobbyPosition)
-
-	for playerID, playerPos := range allPositions {
-		if playerID == excludeClientID {
-			continue
-		}
-
-		if m.isPositionInGrid(playerPos, gridMinX, gridMaxX, gridMinZ, gridMaxZ) {
-			playersInGrid[playerID] = playerPos
-		}
-	}
-
-	shouldLog := true
-	if isLog != nil {
-		shouldLog = *isLog
-	}
-	if shouldLog {
-		fmt.Printf("🔍 Checking collision for %s: %d players in grid\n", excludeClientID, len(playersInGrid))
-	}
-
-	return playersInGrid
-}
-
-func (m *MovementModule) isPositionInGrid(pos LobbyPosition, minX, maxX, minZ, maxZ float64) bool {
-	return pos.X >= minX && pos.X <= maxX && pos.Z >= minZ && pos.Z <= maxZ
-}
-
-func (m *MovementModule) hasCollision(pos1 *gamepacket.Position, pos2 LobbyPosition) bool {
-	dx := pos1.X - pos2.X
-	dz := pos1.Z - pos2.Z
-	distance := math.Sqrt(dx*dx + dz*dz)
-
-	minDistance := PlayerRadius + PlayerRadius
-	return distance < minDistance
-}
-
-func (m *MovementModule) broadcastCurrentPosition(conn net.PacketConn, clientID string, seq uint32) {
-	currentPos, exists := GetLobbyPosition(clientID)
-	if !exists {
-		fmt.Printf("⚠️ Cannot broadcast position - no position found for %s\n", clientID)
-		return
-	}
-
-	correctionPacket := &gamepacket.GamePacket{
-		Seq: seq,
-		ClientPosition: &gamepacket.ClientPosition{
-			ClientId: clientID,
-			Position: &gamepacket.Position{
-				X: currentPos.X,
-				Y: currentPos.Y,
-				Z: currentPos.Z,
-			},
-			Timestamp: float32(time.Now().UnixMilli()) / 1000.0,
-		},
-	}
-
-	BroadcastToAll(conn, correctionPacket, "")
-	fmt.Printf("🚫 Collision rejected: broadcasted current position for %s to all clients\n", clientID)
 }
 
 func (m *MovementModule) isValidClient(clientID string) bool {

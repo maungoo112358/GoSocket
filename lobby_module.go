@@ -18,6 +18,12 @@ const (
 type LobbyModule struct{}
 
 func NewLobbyModule() *LobbyModule {
+	RegisterModule(ModuleInfo{
+		Name:         LobbyModuleEnum,
+		Type:         Critical,
+		Dependencies: []ModuleEnum{},
+		SubModules:   []ModuleEnum{},
+	})
 	return &LobbyModule{}
 }
 
