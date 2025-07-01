@@ -35,7 +35,7 @@ func NewCollisionModule() *CollisionModule {
 	return service
 }
 
-func (c *CollisionModule) CheckPlayerCollision(clientID string, position *gamepacket.Position) bool {
+func (c *CollisionModule) CheckPlayerCollision(clientID string, position *gamepacket.Vector_3) bool {
 	if !c.enabled {
 		return false
 	}
@@ -52,12 +52,12 @@ func (c *CollisionModule) CheckPlayerCollision(clientID string, position *gamepa
 	return false
 }
 
-func (c *CollisionModule) CheckBuildingCollision(buildingID string, position *gamepacket.Position) bool {
+func (c *CollisionModule) CheckBuildingCollision(buildingID string, position *gamepacket.Vector_3) bool {
 	return false // will add later
 }
 
-func (m *CollisionModule) getPlayersInGrid(centerPos *gamepacket.Position, allPositions map[string]LobbyPosition, excludeClientID string, isLog *bool) map[string]LobbyPosition {
-	gridHalfSize := CollisionGridSize / 2.0
+func (m *CollisionModule) getPlayersInGrid(centerPos *gamepacket.Vector_3, allPositions map[string]LobbyPosition, excludeClientID string, isLog *bool) map[string]LobbyPosition {
+	gridHalfSize := float32(CollisionGridSize) / 2.0
 	gridMinX := centerPos.X - gridHalfSize
 	gridMaxX := centerPos.X + gridHalfSize
 	gridMinZ := centerPos.Z - gridHalfSize
@@ -86,16 +86,16 @@ func (m *CollisionModule) getPlayersInGrid(centerPos *gamepacket.Position, allPo
 	return playersInGrid
 }
 
-func (m *CollisionModule) isPositionInGrid(pos LobbyPosition, minX, maxX, minZ, maxZ float64) bool {
+func (m *CollisionModule) isPositionInGrid(pos LobbyPosition, minX, maxX, minZ, maxZ float32) bool {
 	return pos.X >= minX && pos.X <= maxX && pos.Z >= minZ && pos.Z <= maxZ
 }
 
-func (m *CollisionModule) hasCollision(pos1 *gamepacket.Position, pos2 LobbyPosition) bool {
-	dx := pos1.X - pos2.X
-	dz := pos1.Z - pos2.Z
+func (m *CollisionModule) hasCollision(pos1 *gamepacket.Vector_3, pos2 LobbyPosition) bool {
+	dx := float64(pos1.X - pos2.X)
+	dz := float64(pos1.Z - pos2.Z)
 	distance := math.Sqrt(dx*dx + dz*dz)
 
-	minDistance := ClientRadius + ClientRadius
+	minDistance := float64(ClientRadius + ClientRadius)
 	return distance < minDistance
 }
 
@@ -110,7 +110,7 @@ func (m *CollisionModule) BroadcastRejection(conn net.PacketConn, clientID strin
 		Seq: seq,
 		ClientPosition: &gamepacket.ClientPosition{
 			ClientId: clientID,
-			Position: &gamepacket.Position{
+			Position: &gamepacket.Vector_3{
 				X: currentPos.X,
 				Y: currentPos.Y,
 				Z: currentPos.Z,

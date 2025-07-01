@@ -112,7 +112,7 @@ func (m *LobbyModule) getOrCreatePosition(client *ClientInfo) LobbyPosition {
 }
 
 func (m *LobbyModule) generateUniquePosition(publicID string) LobbyPosition {
-	minDistance := MinPositionDistance
+	minDistance := float32(MinPositionDistance)
 
 	// Try with decreasing minimum distance requirements
 	for minDistance >= 0.5 {
@@ -137,13 +137,13 @@ func (m *LobbyModule) generateUniquePosition(publicID string) LobbyPosition {
 
 func (m *LobbyModule) generateRandomPosition() LobbyPosition {
 	return LobbyPosition{
-		X: (rand.Float64()*2 - 1) * LobbyBoundary, // Random between -5 and +5
+		X: float32((rand.Float64()*2 - 1) * float64(LobbyBoundary)),
 		Y: DefaultLobbyY,
-		Z: (rand.Float64()*2 - 1) * LobbyBoundary, // Random between -5 and +5
+		Z: float32((rand.Float64()*2 - 1) * float64(LobbyBoundary)),
 	}
 }
 
-func (m *LobbyModule) hasPositionCollision(newPos LobbyPosition, minDistance float64) bool {
+func (m *LobbyModule) hasPositionCollision(newPos LobbyPosition, minDistance float32) bool {
 	allPositions := GetAllLobbyPositions()
 
 	for _, existingPos := range allPositions {
@@ -156,11 +156,11 @@ func (m *LobbyModule) hasPositionCollision(newPos LobbyPosition, minDistance flo
 	return false
 }
 
-func (m *LobbyModule) calculateDistance(pos1, pos2 LobbyPosition) float64 {
-	dx := pos1.X - pos2.X
-	dy := pos1.Y - pos2.Y
-	dz := pos1.Z - pos2.Z
-	return math.Sqrt(dx*dx + dy*dy + dz*dz)
+func (m *LobbyModule) calculateDistance(pos1, pos2 LobbyPosition) float32 {
+	dx := float64(pos1.X - pos2.X)
+	dy := float64(pos1.Y - pos2.Y)
+	dz := float64(pos1.Z - pos2.Z)
+	return float32(math.Sqrt(dx*dx + dy*dy + dz*dz))
 }
 
 // === Lobby Join Data Management ===
@@ -171,7 +171,7 @@ func (m *LobbyModule) updateLobbyJoinData(lobbyJoin *gamepacket.LobbyJoinBroadca
 
 	// Set position data
 	lobbyJoin.Position = &gamepacket.ClientLobbyPosition{
-		Position: &gamepacket.Position{
+		Position: &gamepacket.Vector_3{
 			X: position.X,
 			Y: position.Y,
 			Z: position.Z,
@@ -263,7 +263,7 @@ func (m *LobbyModule) sendExistingLobbyMembers(conn net.PacketConn, newClient *C
 		var lobbyPosition *gamepacket.ClientLobbyPosition
 		if pos, hasPosition := GetLobbyPosition(client.PublicID); hasPosition {
 			lobbyPosition = &gamepacket.ClientLobbyPosition{
-				Position: &gamepacket.Position{
+				Position: &gamepacket.Vector_3{
 					X: pos.X,
 					Y: pos.Y,
 					Z: pos.Z,

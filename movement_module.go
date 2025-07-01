@@ -204,7 +204,7 @@ func (m *MovementModule) isValidClient(clientID string) bool {
 	return client != nil && client.InLobby
 }
 
-func (m *MovementModule) isValidPosition(pos *gamepacket.Position) bool {
+func (m *MovementModule) isValidPosition(pos *gamepacket.Vector_3) bool {
 	if pos == nil {
 		return false
 	}

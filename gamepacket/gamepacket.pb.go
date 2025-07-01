@@ -21,6 +21,55 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type TileType int32
+
+const (
+	TileType_ROAD_LANE     TileType = 0
+	TileType_CROSS_SECTION TileType = 1
+	TileType_GRASS         TileType = 2
+)
+
+// Enum value maps for TileType.
+var (
+	TileType_name = map[int32]string{
+		0: "ROAD_LANE",
+		1: "CROSS_SECTION",
+		2: "GRASS",
+	}
+	TileType_value = map[string]int32{
+		"ROAD_LANE":     0,
+		"CROSS_SECTION": 1,
+		"GRASS":         2,
+	}
+)
+
+func (x TileType) Enum() *TileType {
+	p := new(TileType)
+	*p = x
+	return p
+}
+
+func (x TileType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TileType) Descriptor() protoreflect.EnumDescriptor {
+	return file_gamepacket_proto_enumTypes[0].Descriptor()
+}
+
+func (TileType) Type() protoreflect.EnumType {
+	return &file_gamepacket_proto_enumTypes[0]
+}
+
+func (x TileType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TileType.Descriptor instead.
+func (TileType) EnumDescriptor() ([]byte, []int) {
+	return file_gamepacket_proto_rawDescGZIP(), []int{0}
+}
+
 type GamePacket struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	Seq                  uint32                 `protobuf:"varint,1,opt,name=Seq,proto3" json:"Seq,omitempty"`
@@ -36,6 +85,8 @@ type GamePacket struct {
 	UsernameResponse     *UsernameResponse      `protobuf:"bytes,11,opt,name=UsernameResponse,proto3" json:"UsernameResponse,omitempty"`
 	ReconnectionRequest  *ReconnectionRequest   `protobuf:"bytes,12,opt,name=ReconnectionRequest,proto3" json:"ReconnectionRequest,omitempty"`
 	ReconnectionResponse *ReconnectionResponse  `protobuf:"bytes,13,opt,name=ReconnectionResponse,proto3" json:"ReconnectionResponse,omitempty"`
+	WorldTile            *WorldTile             `protobuf:"bytes,14,opt,name=WorldTile,proto3" json:"WorldTile,omitempty"`
+	WorldData            *WorldData             `protobuf:"bytes,15,opt,name=WorldData,proto3" json:"WorldData,omitempty"`
 	ServerStatus         *ServerStatus          `protobuf:"bytes,99,opt,name=ServerStatus,proto3" json:"ServerStatus,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
@@ -158,6 +209,20 @@ func (x *GamePacket) GetReconnectionRequest() *ReconnectionRequest {
 func (x *GamePacket) GetReconnectionResponse() *ReconnectionResponse {
 	if x != nil {
 		return x.ReconnectionResponse
+	}
+	return nil
+}
+
+func (x *GamePacket) GetWorldTile() *WorldTile {
+	if x != nil {
+		return x.WorldTile
+	}
+	return nil
+}
+
+func (x *GamePacket) GetWorldData() *WorldData {
+	if x != nil {
+		return x.WorldData
 	}
 	return nil
 }
@@ -605,8 +670,8 @@ type ClientPosition struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ClientId      string                 `protobuf:"bytes,1,opt,name=clientId,proto3" json:"clientId,omitempty"`
 	Timestamp     float32                `protobuf:"fixed32,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	Position      *Position              `protobuf:"bytes,3,opt,name=position,proto3" json:"position,omitempty"`
-	Velocity      *Velocity              `protobuf:"bytes,4,opt,name=velocity,proto3" json:"velocity,omitempty"`
+	Position      *Vector_3              `protobuf:"bytes,3,opt,name=position,proto3" json:"position,omitempty"`
+	Velocity      *Vector_3              `protobuf:"bytes,4,opt,name=velocity,proto3" json:"velocity,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -655,14 +720,14 @@ func (x *ClientPosition) GetTimestamp() float32 {
 	return 0
 }
 
-func (x *ClientPosition) GetPosition() *Position {
+func (x *ClientPosition) GetPosition() *Vector_3 {
 	if x != nil {
 		return x.Position
 	}
 	return nil
 }
 
-func (x *ClientPosition) GetVelocity() *Velocity {
+func (x *ClientPosition) GetVelocity() *Vector_3 {
 	if x != nil {
 		return x.Velocity
 	}
@@ -671,7 +736,7 @@ func (x *ClientPosition) GetVelocity() *Velocity {
 
 type ClientLobbyPosition struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Position      *Position              `protobuf:"bytes,1,opt,name=position,proto3" json:"position,omitempty"`
+	Position      *Vector_3              `protobuf:"bytes,1,opt,name=position,proto3" json:"position,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -706,7 +771,7 @@ func (*ClientLobbyPosition) Descriptor() ([]byte, []int) {
 	return file_gamepacket_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *ClientLobbyPosition) GetPosition() *Position {
+func (x *ClientLobbyPosition) GetPosition() *Vector_3 {
 	if x != nil {
 		return x.Position
 	}
@@ -853,29 +918,28 @@ func (x *ServerStatus) GetClientId() string {
 	return ""
 }
 
-type Position struct {
+type WorldData struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	X             float64                `protobuf:"fixed64,1,opt,name=x,proto3" json:"x,omitempty"`
-	Y             float64                `protobuf:"fixed64,2,opt,name=y,proto3" json:"y,omitempty"`
-	Z             float64                `protobuf:"fixed64,3,opt,name=z,proto3" json:"z,omitempty"`
+	Tiles         []*WorldTile           `protobuf:"bytes,1,rep,name=tiles,proto3" json:"tiles,omitempty"`
+	WorldSize     int32                  `protobuf:"varint,2,opt,name=world_size,json=worldSize,proto3" json:"world_size,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Position) Reset() {
-	*x = Position{}
+func (x *WorldData) Reset() {
+	*x = WorldData{}
 	mi := &file_gamepacket_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Position) String() string {
+func (x *WorldData) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Position) ProtoMessage() {}
+func (*WorldData) ProtoMessage() {}
 
-func (x *Position) ProtoReflect() protoreflect.Message {
+func (x *WorldData) ProtoReflect() protoreflect.Message {
 	mi := &file_gamepacket_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -887,55 +951,48 @@ func (x *Position) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Position.ProtoReflect.Descriptor instead.
-func (*Position) Descriptor() ([]byte, []int) {
+// Deprecated: Use WorldData.ProtoReflect.Descriptor instead.
+func (*WorldData) Descriptor() ([]byte, []int) {
 	return file_gamepacket_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *Position) GetX() float64 {
+func (x *WorldData) GetTiles() []*WorldTile {
 	if x != nil {
-		return x.X
+		return x.Tiles
+	}
+	return nil
+}
+
+func (x *WorldData) GetWorldSize() int32 {
+	if x != nil {
+		return x.WorldSize
 	}
 	return 0
 }
 
-func (x *Position) GetY() float64 {
-	if x != nil {
-		return x.Y
-	}
-	return 0
-}
-
-func (x *Position) GetZ() float64 {
-	if x != nil {
-		return x.Z
-	}
-	return 0
-}
-
-type Velocity struct {
+type Vector_3 struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	X             float64                `protobuf:"fixed64,1,opt,name=x,proto3" json:"x,omitempty"`
-	Y             float64                `protobuf:"fixed64,2,opt,name=y,proto3" json:"y,omitempty"`
-	Z             float64                `protobuf:"fixed64,3,opt,name=z,proto3" json:"z,omitempty"`
+	X             float32                `protobuf:"fixed32,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y             float32                `protobuf:"fixed32,2,opt,name=y,proto3" json:"y,omitempty"`
+	Z             float32                `protobuf:"fixed32,3,opt,name=z,proto3" json:"z,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Velocity) Reset() {
-	*x = Velocity{}
+func (x *Vector_3) Reset() {
+	*x = Vector_3{}
 	mi := &file_gamepacket_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Velocity) String() string {
+func (x *Vector_3) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Velocity) ProtoMessage() {}
+func (*Vector_3) ProtoMessage() {}
 
-func (x *Velocity) ProtoReflect() protoreflect.Message {
+func (x *Vector_3) ProtoReflect() protoreflect.Message {
 	mi := &file_gamepacket_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -947,30 +1004,106 @@ func (x *Velocity) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Velocity.ProtoReflect.Descriptor instead.
-func (*Velocity) Descriptor() ([]byte, []int) {
+// Deprecated: Use Vector_3.ProtoReflect.Descriptor instead.
+func (*Vector_3) Descriptor() ([]byte, []int) {
 	return file_gamepacket_proto_rawDescGZIP(), []int{15}
 }
 
-func (x *Velocity) GetX() float64 {
+func (x *Vector_3) GetX() float32 {
 	if x != nil {
 		return x.X
 	}
 	return 0
 }
 
-func (x *Velocity) GetY() float64 {
+func (x *Vector_3) GetY() float32 {
 	if x != nil {
 		return x.Y
 	}
 	return 0
 }
 
-func (x *Velocity) GetZ() float64 {
+func (x *Vector_3) GetZ() float32 {
 	if x != nil {
 		return x.Z
 	}
 	return 0
+}
+
+type WorldTile struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Position      *Vector_3              `protobuf:"bytes,1,opt,name=position,proto3" json:"position,omitempty"`
+	Rotation      *Vector_3              `protobuf:"bytes,2,opt,name=rotation,proto3" json:"rotation,omitempty"`
+	Scale         *Vector_3              `protobuf:"bytes,3,opt,name=scale,proto3" json:"scale,omitempty"`
+	Type          TileType               `protobuf:"varint,4,opt,name=type,proto3,enum=gamepacket.TileType" json:"type,omitempty"`
+	IsScalable    bool                   `protobuf:"varint,5,opt,name=isScalable,proto3" json:"isScalable,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorldTile) Reset() {
+	*x = WorldTile{}
+	mi := &file_gamepacket_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorldTile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorldTile) ProtoMessage() {}
+
+func (x *WorldTile) ProtoReflect() protoreflect.Message {
+	mi := &file_gamepacket_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorldTile.ProtoReflect.Descriptor instead.
+func (*WorldTile) Descriptor() ([]byte, []int) {
+	return file_gamepacket_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *WorldTile) GetPosition() *Vector_3 {
+	if x != nil {
+		return x.Position
+	}
+	return nil
+}
+
+func (x *WorldTile) GetRotation() *Vector_3 {
+	if x != nil {
+		return x.Rotation
+	}
+	return nil
+}
+
+func (x *WorldTile) GetScale() *Vector_3 {
+	if x != nil {
+		return x.Scale
+	}
+	return nil
+}
+
+func (x *WorldTile) GetType() TileType {
+	if x != nil {
+		return x.Type
+	}
+	return TileType_ROAD_LANE
+}
+
+func (x *WorldTile) GetIsScalable() bool {
+	if x != nil {
+		return x.IsScalable
+	}
+	return false
 }
 
 var File_gamepacket_proto protoreflect.FileDescriptor
@@ -978,7 +1111,7 @@ var File_gamepacket_proto protoreflect.FileDescriptor
 const file_gamepacket_proto_rawDesc = "" +
 	"\n" +
 	"\x10gamepacket.proto\x12\n" +
-	"gamepacket\"\xd4\a\n" +
+	"gamepacket\"\xbe\b\n" +
 	"\n" +
 	"GamePacket\x12\x10\n" +
 	"\x03Seq\x18\x01 \x01(\rR\x03Seq\x12H\n" +
@@ -994,7 +1127,9 @@ const file_gamepacket_proto_rawDesc = "" +
 	" \x01(\v2\x1e.gamepacket.UsernameSubmissionR\x12UsernameSubmission\x12H\n" +
 	"\x10UsernameResponse\x18\v \x01(\v2\x1c.gamepacket.UsernameResponseR\x10UsernameResponse\x12Q\n" +
 	"\x13ReconnectionRequest\x18\f \x01(\v2\x1f.gamepacket.ReconnectionRequestR\x13ReconnectionRequest\x12T\n" +
-	"\x14ReconnectionResponse\x18\r \x01(\v2 .gamepacket.ReconnectionResponseR\x14ReconnectionResponse\x12<\n" +
+	"\x14ReconnectionResponse\x18\r \x01(\v2 .gamepacket.ReconnectionResponseR\x14ReconnectionResponse\x123\n" +
+	"\tWorldTile\x18\x0e \x01(\v2\x15.gamepacket.WorldTileR\tWorldTile\x123\n" +
+	"\tWorldData\x18\x0f \x01(\v2\x15.gamepacket.WorldDataR\tWorldData\x12<\n" +
 	"\fServerStatus\x18c \x01(\v2\x18.gamepacket.ServerStatusR\fServerStatus\"2\n" +
 	"\x10HandshakeRequest\x12\x1e\n" +
 	"\n" +
@@ -1029,25 +1164,37 @@ const file_gamepacket_proto_rawDesc = "" +
 	"\x0eClientPosition\x12\x1a\n" +
 	"\bclientId\x18\x01 \x01(\tR\bclientId\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x02R\ttimestamp\x120\n" +
-	"\bposition\x18\x03 \x01(\v2\x14.gamepacket.PositionR\bposition\x120\n" +
-	"\bvelocity\x18\x04 \x01(\v2\x14.gamepacket.VelocityR\bvelocity\"G\n" +
+	"\bposition\x18\x03 \x01(\v2\x14.gamepacket.Vector_3R\bposition\x120\n" +
+	"\bvelocity\x18\x04 \x01(\v2\x14.gamepacket.Vector_3R\bvelocity\"G\n" +
 	"\x13ClientLobbyPosition\x120\n" +
-	"\bposition\x18\x01 \x01(\v2\x14.gamepacket.PositionR\bposition\"'\n" +
+	"\bposition\x18\x01 \x01(\v2\x14.gamepacket.Vector_3R\bposition\"'\n" +
 	"\tHeartbeat\x12\x1a\n" +
 	"\bclientId\x18\x01 \x01(\tR\bclientId\"*\n" +
 	"\fHeartbeatAck\x12\x1a\n" +
 	"\bclientId\x18\x01 \x01(\tR\bclientId\"D\n" +
 	"\fServerStatus\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1a\n" +
-	"\bclientId\x18\x02 \x01(\tR\bclientId\"4\n" +
-	"\bPosition\x12\f\n" +
-	"\x01x\x18\x01 \x01(\x01R\x01x\x12\f\n" +
-	"\x01y\x18\x02 \x01(\x01R\x01y\x12\f\n" +
-	"\x01z\x18\x03 \x01(\x01R\x01z\"4\n" +
-	"\bVelocity\x12\f\n" +
-	"\x01x\x18\x01 \x01(\x01R\x01x\x12\f\n" +
-	"\x01y\x18\x02 \x01(\x01R\x01y\x12\f\n" +
-	"\x01z\x18\x03 \x01(\x01R\x01zB\x15Z\x13gosocket/gamepacketb\x06proto3"
+	"\bclientId\x18\x02 \x01(\tR\bclientId\"W\n" +
+	"\tWorldData\x12+\n" +
+	"\x05tiles\x18\x01 \x03(\v2\x15.gamepacket.WorldTileR\x05tiles\x12\x1d\n" +
+	"\n" +
+	"world_size\x18\x02 \x01(\x05R\tworldSize\"4\n" +
+	"\bVector_3\x12\f\n" +
+	"\x01x\x18\x01 \x01(\x02R\x01x\x12\f\n" +
+	"\x01y\x18\x02 \x01(\x02R\x01y\x12\f\n" +
+	"\x01z\x18\x03 \x01(\x02R\x01z\"\xe5\x01\n" +
+	"\tWorldTile\x120\n" +
+	"\bposition\x18\x01 \x01(\v2\x14.gamepacket.Vector_3R\bposition\x120\n" +
+	"\brotation\x18\x02 \x01(\v2\x14.gamepacket.Vector_3R\brotation\x12*\n" +
+	"\x05scale\x18\x03 \x01(\v2\x14.gamepacket.Vector_3R\x05scale\x12(\n" +
+	"\x04type\x18\x04 \x01(\x0e2\x14.gamepacket.TileTypeR\x04type\x12\x1e\n" +
+	"\n" +
+	"isScalable\x18\x05 \x01(\bR\n" +
+	"isScalable*7\n" +
+	"\bTileType\x12\r\n" +
+	"\tROAD_LANE\x10\x00\x12\x11\n" +
+	"\rCROSS_SECTION\x10\x01\x12\t\n" +
+	"\x05GRASS\x10\x02B\x15Z\x13gosocket/gamepacketb\x06proto3"
 
 var (
 	file_gamepacket_proto_rawDescOnce sync.Once
@@ -1061,48 +1208,58 @@ func file_gamepacket_proto_rawDescGZIP() []byte {
 	return file_gamepacket_proto_rawDescData
 }
 
-var file_gamepacket_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_gamepacket_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_gamepacket_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_gamepacket_proto_goTypes = []any{
-	(*GamePacket)(nil),           // 0: gamepacket.GamePacket
-	(*HandshakeRequest)(nil),     // 1: gamepacket.HandshakeRequest
-	(*HandshakeResponse)(nil),    // 2: gamepacket.HandshakeResponse
-	(*UsernamePrompt)(nil),       // 3: gamepacket.UsernamePrompt
-	(*UsernameSubmission)(nil),   // 4: gamepacket.UsernameSubmission
-	(*UsernameResponse)(nil),     // 5: gamepacket.UsernameResponse
-	(*ReconnectionRequest)(nil),  // 6: gamepacket.ReconnectionRequest
-	(*ReconnectionResponse)(nil), // 7: gamepacket.ReconnectionResponse
-	(*LobbyJoinBroadcast)(nil),   // 8: gamepacket.LobbyJoinBroadcast
-	(*ClientPosition)(nil),       // 9: gamepacket.ClientPosition
-	(*ClientLobbyPosition)(nil),  // 10: gamepacket.ClientLobbyPosition
-	(*Heartbeat)(nil),            // 11: gamepacket.Heartbeat
-	(*HeartbeatAck)(nil),         // 12: gamepacket.HeartbeatAck
-	(*ServerStatus)(nil),         // 13: gamepacket.ServerStatus
-	(*Position)(nil),             // 14: gamepacket.Position
-	(*Velocity)(nil),             // 15: gamepacket.Velocity
+	(TileType)(0),                // 0: gamepacket.TileType
+	(*GamePacket)(nil),           // 1: gamepacket.GamePacket
+	(*HandshakeRequest)(nil),     // 2: gamepacket.HandshakeRequest
+	(*HandshakeResponse)(nil),    // 3: gamepacket.HandshakeResponse
+	(*UsernamePrompt)(nil),       // 4: gamepacket.UsernamePrompt
+	(*UsernameSubmission)(nil),   // 5: gamepacket.UsernameSubmission
+	(*UsernameResponse)(nil),     // 6: gamepacket.UsernameResponse
+	(*ReconnectionRequest)(nil),  // 7: gamepacket.ReconnectionRequest
+	(*ReconnectionResponse)(nil), // 8: gamepacket.ReconnectionResponse
+	(*LobbyJoinBroadcast)(nil),   // 9: gamepacket.LobbyJoinBroadcast
+	(*ClientPosition)(nil),       // 10: gamepacket.ClientPosition
+	(*ClientLobbyPosition)(nil),  // 11: gamepacket.ClientLobbyPosition
+	(*Heartbeat)(nil),            // 12: gamepacket.Heartbeat
+	(*HeartbeatAck)(nil),         // 13: gamepacket.HeartbeatAck
+	(*ServerStatus)(nil),         // 14: gamepacket.ServerStatus
+	(*WorldData)(nil),            // 15: gamepacket.WorldData
+	(*Vector_3)(nil),             // 16: gamepacket.Vector_3
+	(*WorldTile)(nil),            // 17: gamepacket.WorldTile
 }
 var file_gamepacket_proto_depIdxs = []int32{
-	1,  // 0: gamepacket.GamePacket.HandshakeRequest:type_name -> gamepacket.HandshakeRequest
-	2,  // 1: gamepacket.GamePacket.HandshakeResponse:type_name -> gamepacket.HandshakeResponse
-	11, // 2: gamepacket.GamePacket.Heartbeat:type_name -> gamepacket.Heartbeat
-	12, // 3: gamepacket.GamePacket.HeartbeatAck:type_name -> gamepacket.HeartbeatAck
-	9,  // 4: gamepacket.GamePacket.ClientPosition:type_name -> gamepacket.ClientPosition
-	8,  // 5: gamepacket.GamePacket.LobbyJoinBroadcast:type_name -> gamepacket.LobbyJoinBroadcast
-	10, // 6: gamepacket.GamePacket.ClientLobbyPosition:type_name -> gamepacket.ClientLobbyPosition
-	3,  // 7: gamepacket.GamePacket.UsernamePrompt:type_name -> gamepacket.UsernamePrompt
-	4,  // 8: gamepacket.GamePacket.UsernameSubmission:type_name -> gamepacket.UsernameSubmission
-	5,  // 9: gamepacket.GamePacket.UsernameResponse:type_name -> gamepacket.UsernameResponse
-	6,  // 10: gamepacket.GamePacket.ReconnectionRequest:type_name -> gamepacket.ReconnectionRequest
-	7,  // 11: gamepacket.GamePacket.ReconnectionResponse:type_name -> gamepacket.ReconnectionResponse
-	13, // 12: gamepacket.GamePacket.ServerStatus:type_name -> gamepacket.ServerStatus
-	10, // 13: gamepacket.LobbyJoinBroadcast.position:type_name -> gamepacket.ClientLobbyPosition
-	14, // 14: gamepacket.ClientPosition.position:type_name -> gamepacket.Position
-	15, // 15: gamepacket.ClientPosition.velocity:type_name -> gamepacket.Velocity
-	14, // 16: gamepacket.ClientLobbyPosition.position:type_name -> gamepacket.Position
-	17, // [17:17] is the sub-list for method output_type
-	17, // [17:17] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	2,  // 0: gamepacket.GamePacket.HandshakeRequest:type_name -> gamepacket.HandshakeRequest
+	3,  // 1: gamepacket.GamePacket.HandshakeResponse:type_name -> gamepacket.HandshakeResponse
+	12, // 2: gamepacket.GamePacket.Heartbeat:type_name -> gamepacket.Heartbeat
+	13, // 3: gamepacket.GamePacket.HeartbeatAck:type_name -> gamepacket.HeartbeatAck
+	10, // 4: gamepacket.GamePacket.ClientPosition:type_name -> gamepacket.ClientPosition
+	9,  // 5: gamepacket.GamePacket.LobbyJoinBroadcast:type_name -> gamepacket.LobbyJoinBroadcast
+	11, // 6: gamepacket.GamePacket.ClientLobbyPosition:type_name -> gamepacket.ClientLobbyPosition
+	4,  // 7: gamepacket.GamePacket.UsernamePrompt:type_name -> gamepacket.UsernamePrompt
+	5,  // 8: gamepacket.GamePacket.UsernameSubmission:type_name -> gamepacket.UsernameSubmission
+	6,  // 9: gamepacket.GamePacket.UsernameResponse:type_name -> gamepacket.UsernameResponse
+	7,  // 10: gamepacket.GamePacket.ReconnectionRequest:type_name -> gamepacket.ReconnectionRequest
+	8,  // 11: gamepacket.GamePacket.ReconnectionResponse:type_name -> gamepacket.ReconnectionResponse
+	17, // 12: gamepacket.GamePacket.WorldTile:type_name -> gamepacket.WorldTile
+	15, // 13: gamepacket.GamePacket.WorldData:type_name -> gamepacket.WorldData
+	14, // 14: gamepacket.GamePacket.ServerStatus:type_name -> gamepacket.ServerStatus
+	11, // 15: gamepacket.LobbyJoinBroadcast.position:type_name -> gamepacket.ClientLobbyPosition
+	16, // 16: gamepacket.ClientPosition.position:type_name -> gamepacket.Vector_3
+	16, // 17: gamepacket.ClientPosition.velocity:type_name -> gamepacket.Vector_3
+	16, // 18: gamepacket.ClientLobbyPosition.position:type_name -> gamepacket.Vector_3
+	17, // 19: gamepacket.WorldData.tiles:type_name -> gamepacket.WorldTile
+	16, // 20: gamepacket.WorldTile.position:type_name -> gamepacket.Vector_3
+	16, // 21: gamepacket.WorldTile.rotation:type_name -> gamepacket.Vector_3
+	16, // 22: gamepacket.WorldTile.scale:type_name -> gamepacket.Vector_3
+	0,  // 23: gamepacket.WorldTile.type:type_name -> gamepacket.TileType
+	24, // [24:24] is the sub-list for method output_type
+	24, // [24:24] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_gamepacket_proto_init() }
@@ -1115,13 +1272,14 @@ func file_gamepacket_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gamepacket_proto_rawDesc), len(file_gamepacket_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   16,
+			NumEnums:      1,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_gamepacket_proto_goTypes,
 		DependencyIndexes: file_gamepacket_proto_depIdxs,
+		EnumInfos:         file_gamepacket_proto_enumTypes,
 		MessageInfos:      file_gamepacket_proto_msgTypes,
 	}.Build()
 	File_gamepacket_proto = out.File

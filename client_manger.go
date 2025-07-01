@@ -37,7 +37,7 @@ type PendingClient struct {
 
 // LobbyPosition tracks where a client is positioned in the lobby
 type LobbyPosition struct {
-	X, Y, Z float64
+	X, Y, Z float32
 }
 
 // Client storage

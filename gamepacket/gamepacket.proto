@@ -17,6 +17,8 @@ message GamePacket {
   UsernameResponse UsernameResponse = 11;   
   ReconnectionRequest ReconnectionRequest = 12;
   ReconnectionResponse ReconnectionResponse = 13;
+  WorldTile WorldTile = 14;
+  WorldData WorldData = 15;
   ServerStatus ServerStatus = 99;
 }
 
@@ -65,12 +67,12 @@ message LobbyJoinBroadcast {
 message ClientPosition {
   string clientId = 1;
   float timestamp = 2;
-  Position position = 3;
-  Velocity velocity = 4;
+  Vector_3 position = 3;
+  Vector_3 velocity = 4;
 }
 
 message ClientLobbyPosition {
-  Position position = 1;
+  Vector_3 position = 1;
 }
 
 message Heartbeat {
@@ -86,14 +88,27 @@ message ServerStatus {
   string clientId = 2;
 }
 
-message Position{
-  double x = 1;
-  double y = 2;
-  double z = 3;
+message WorldData {
+  repeated WorldTile tiles = 1;
+  int32 world_size = 2;
 }
 
-message Velocity{
-  double x = 1;
-  double y = 2;
-  double z = 3;
+message Vector_3{
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+message WorldTile {
+  Vector_3 position = 1;
+  Vector_3 rotation = 2;
+  Vector_3 scale = 3;
+  TileType type = 4;
+  bool isScalable = 5;
+}
+
+enum TileType {
+  ROAD_LANE = 0;
+  CROSS_SECTION = 1;  
+  GRASS = 2;
 }
