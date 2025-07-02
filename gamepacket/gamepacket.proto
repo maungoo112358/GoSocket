@@ -17,8 +17,8 @@ message GamePacket {
   UsernameResponse UsernameResponse = 11;   
   ReconnectionRequest ReconnectionRequest = 12;
   ReconnectionResponse ReconnectionResponse = 13;
-  WorldTile WorldTile = 14;
-  WorldData WorldData = 15;
+  Tile Tile = 14;
+  TileSet TileSet = 15;
   ServerStatus ServerStatus = 99;
 }
 
@@ -88,9 +88,18 @@ message ServerStatus {
   string clientId = 2;
 }
 
-message WorldData {
-  repeated WorldTile tiles = 1;
-  int32 world_size = 2;
+message TileSet {
+  repeated Tile tiles = 2;
+  int32 world_size = 3;
+}
+
+message Tile {
+  string tileId = 1;
+  Vector_3 position = 2;
+  Vector_3 rotation = 3;
+  Vector_3 scale = 4;
+  TileType type = 5;
+  bool isScalable = 6;
 }
 
 message Vector_3{
@@ -99,16 +108,9 @@ message Vector_3{
   float z = 3;
 }
 
-message WorldTile {
-  Vector_3 position = 1;
-  Vector_3 rotation = 2;
-  Vector_3 scale = 3;
-  TileType type = 4;
-  bool isScalable = 5;
-}
-
 enum TileType {
-  ROAD_LANE = 0;
-  CROSS_SECTION = 1;  
-  GRASS = 2;
+  None = 0;
+  ROAD_LANE = 1;
+  CROSS_SECTION = 2;
+  GRASS = 3;
 }

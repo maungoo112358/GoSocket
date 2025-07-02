@@ -27,12 +27,10 @@ func NewLobbyModule() *LobbyModule {
 	return &LobbyModule{}
 }
 
-// CanHandle determines if this module can process the packet
 func (m *LobbyModule) CanHandle(pkt *gamepacket.GamePacket) bool {
 	return pkt.GetLobbyJoinBroadcast() != nil
 }
 
-// Handle processes lobby join requests
 func (m *LobbyModule) Handle(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) {
 	lobbyJoin := pkt.GetLobbyJoinBroadcast()
 	if lobbyJoin == nil {
@@ -234,6 +232,11 @@ func (m *LobbyModule) sendWelcomeSequence(conn net.PacketConn, client *ClientInf
 
 	// Send lobby statistics
 	m.sendLobbyStatistics(conn, client)
+
+	if service := GetService(TileGenerationModuleEnum); service != nil {
+		tileGeneration := service.(TileGenerationService)
+		tileGeneration.GenerateTileForClient(conn, client)
+	}
 }
 
 func (m *LobbyModule) sendWelcomeMessage(conn net.PacketConn, client *ClientInfo) {

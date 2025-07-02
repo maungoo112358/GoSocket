@@ -14,6 +14,7 @@ const (
 	LobbyModuleEnum
 	MovementModuleEnum
 	CollisionModuleEnum
+	TileGenerationModuleEnum
 )
 
 // Module types
@@ -30,6 +31,11 @@ type ModuleInfo struct {
 	Type         ModuleType
 	Dependencies []ModuleEnum
 	SubModules   []ModuleEnum
+}
+
+// Tile Generation Service Interface
+type TileGenerationService interface {
+	GenerateTileForClient(conn net.PacketConn, client *ClientInfo)
 }
 
 // Module registry
@@ -114,6 +120,8 @@ func getModuleName(module ModuleEnum) string {
 		return "Movement"
 	case CollisionModuleEnum:
 		return "Collision"
+	case TileGenerationModuleEnum:
+		return "WorldGeneration"
 	default:
 		return "Unknown"
 	}
@@ -140,11 +148,13 @@ var modules []ServerModule
 
 func init() {
 	movementModule := NewMovementModule()
+	worldGenerationModule := NewTileGenerationModule()
 
 	modules = []ServerModule{
 		NewConnectionModule(),
 		NewLobbyModule(),
 		movementModule,
+		worldGenerationModule,
 	}
 	movementModule.StartWorkers()
 

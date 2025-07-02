@@ -24,22 +24,25 @@ const (
 type TileType int32
 
 const (
-	TileType_ROAD_LANE     TileType = 0
-	TileType_CROSS_SECTION TileType = 1
-	TileType_GRASS         TileType = 2
+	TileType_None          TileType = 0
+	TileType_ROAD_LANE     TileType = 1
+	TileType_CROSS_SECTION TileType = 2
+	TileType_GRASS         TileType = 3
 )
 
 // Enum value maps for TileType.
 var (
 	TileType_name = map[int32]string{
-		0: "ROAD_LANE",
-		1: "CROSS_SECTION",
-		2: "GRASS",
+		0: "None",
+		1: "ROAD_LANE",
+		2: "CROSS_SECTION",
+		3: "GRASS",
 	}
 	TileType_value = map[string]int32{
-		"ROAD_LANE":     0,
-		"CROSS_SECTION": 1,
-		"GRASS":         2,
+		"None":          0,
+		"ROAD_LANE":     1,
+		"CROSS_SECTION": 2,
+		"GRASS":         3,
 	}
 )
 
@@ -85,8 +88,8 @@ type GamePacket struct {
 	UsernameResponse     *UsernameResponse      `protobuf:"bytes,11,opt,name=UsernameResponse,proto3" json:"UsernameResponse,omitempty"`
 	ReconnectionRequest  *ReconnectionRequest   `protobuf:"bytes,12,opt,name=ReconnectionRequest,proto3" json:"ReconnectionRequest,omitempty"`
 	ReconnectionResponse *ReconnectionResponse  `protobuf:"bytes,13,opt,name=ReconnectionResponse,proto3" json:"ReconnectionResponse,omitempty"`
-	WorldTile            *WorldTile             `protobuf:"bytes,14,opt,name=WorldTile,proto3" json:"WorldTile,omitempty"`
-	WorldData            *WorldData             `protobuf:"bytes,15,opt,name=WorldData,proto3" json:"WorldData,omitempty"`
+	Tile                 *Tile                  `protobuf:"bytes,14,opt,name=Tile,proto3" json:"Tile,omitempty"`
+	TileSet              *TileSet               `protobuf:"bytes,15,opt,name=TileSet,proto3" json:"TileSet,omitempty"`
 	ServerStatus         *ServerStatus          `protobuf:"bytes,99,opt,name=ServerStatus,proto3" json:"ServerStatus,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
@@ -213,16 +216,16 @@ func (x *GamePacket) GetReconnectionResponse() *ReconnectionResponse {
 	return nil
 }
 
-func (x *GamePacket) GetWorldTile() *WorldTile {
+func (x *GamePacket) GetTile() *Tile {
 	if x != nil {
-		return x.WorldTile
+		return x.Tile
 	}
 	return nil
 }
 
-func (x *GamePacket) GetWorldData() *WorldData {
+func (x *GamePacket) GetTileSet() *TileSet {
 	if x != nil {
-		return x.WorldData
+		return x.TileSet
 	}
 	return nil
 }
@@ -918,28 +921,28 @@ func (x *ServerStatus) GetClientId() string {
 	return ""
 }
 
-type WorldData struct {
+type TileSet struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Tiles         []*WorldTile           `protobuf:"bytes,1,rep,name=tiles,proto3" json:"tiles,omitempty"`
-	WorldSize     int32                  `protobuf:"varint,2,opt,name=world_size,json=worldSize,proto3" json:"world_size,omitempty"`
+	Tiles         []*Tile                `protobuf:"bytes,2,rep,name=tiles,proto3" json:"tiles,omitempty"`
+	WorldSize     int32                  `protobuf:"varint,3,opt,name=world_size,json=worldSize,proto3" json:"world_size,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *WorldData) Reset() {
-	*x = WorldData{}
+func (x *TileSet) Reset() {
+	*x = TileSet{}
 	mi := &file_gamepacket_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *WorldData) String() string {
+func (x *TileSet) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*WorldData) ProtoMessage() {}
+func (*TileSet) ProtoMessage() {}
 
-func (x *WorldData) ProtoReflect() protoreflect.Message {
+func (x *TileSet) ProtoReflect() protoreflect.Message {
 	mi := &file_gamepacket_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -951,23 +954,107 @@ func (x *WorldData) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use WorldData.ProtoReflect.Descriptor instead.
-func (*WorldData) Descriptor() ([]byte, []int) {
+// Deprecated: Use TileSet.ProtoReflect.Descriptor instead.
+func (*TileSet) Descriptor() ([]byte, []int) {
 	return file_gamepacket_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *WorldData) GetTiles() []*WorldTile {
+func (x *TileSet) GetTiles() []*Tile {
 	if x != nil {
 		return x.Tiles
 	}
 	return nil
 }
 
-func (x *WorldData) GetWorldSize() int32 {
+func (x *TileSet) GetWorldSize() int32 {
 	if x != nil {
 		return x.WorldSize
 	}
 	return 0
+}
+
+type Tile struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TileId        string                 `protobuf:"bytes,1,opt,name=tileId,proto3" json:"tileId,omitempty"`
+	Position      *Vector_3              `protobuf:"bytes,2,opt,name=position,proto3" json:"position,omitempty"`
+	Rotation      *Vector_3              `protobuf:"bytes,3,opt,name=rotation,proto3" json:"rotation,omitempty"`
+	Scale         *Vector_3              `protobuf:"bytes,4,opt,name=scale,proto3" json:"scale,omitempty"`
+	Type          TileType               `protobuf:"varint,5,opt,name=type,proto3,enum=gamepacket.TileType" json:"type,omitempty"`
+	IsScalable    bool                   `protobuf:"varint,6,opt,name=isScalable,proto3" json:"isScalable,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Tile) Reset() {
+	*x = Tile{}
+	mi := &file_gamepacket_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Tile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Tile) ProtoMessage() {}
+
+func (x *Tile) ProtoReflect() protoreflect.Message {
+	mi := &file_gamepacket_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Tile.ProtoReflect.Descriptor instead.
+func (*Tile) Descriptor() ([]byte, []int) {
+	return file_gamepacket_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *Tile) GetTileId() string {
+	if x != nil {
+		return x.TileId
+	}
+	return ""
+}
+
+func (x *Tile) GetPosition() *Vector_3 {
+	if x != nil {
+		return x.Position
+	}
+	return nil
+}
+
+func (x *Tile) GetRotation() *Vector_3 {
+	if x != nil {
+		return x.Rotation
+	}
+	return nil
+}
+
+func (x *Tile) GetScale() *Vector_3 {
+	if x != nil {
+		return x.Scale
+	}
+	return nil
+}
+
+func (x *Tile) GetType() TileType {
+	if x != nil {
+		return x.Type
+	}
+	return TileType_None
+}
+
+func (x *Tile) GetIsScalable() bool {
+	if x != nil {
+		return x.IsScalable
+	}
+	return false
 }
 
 type Vector_3 struct {
@@ -981,7 +1068,7 @@ type Vector_3 struct {
 
 func (x *Vector_3) Reset() {
 	*x = Vector_3{}
-	mi := &file_gamepacket_proto_msgTypes[15]
+	mi := &file_gamepacket_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -993,7 +1080,7 @@ func (x *Vector_3) String() string {
 func (*Vector_3) ProtoMessage() {}
 
 func (x *Vector_3) ProtoReflect() protoreflect.Message {
-	mi := &file_gamepacket_proto_msgTypes[15]
+	mi := &file_gamepacket_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1006,7 +1093,7 @@ func (x *Vector_3) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Vector_3.ProtoReflect.Descriptor instead.
 func (*Vector_3) Descriptor() ([]byte, []int) {
-	return file_gamepacket_proto_rawDescGZIP(), []int{15}
+	return file_gamepacket_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Vector_3) GetX() float32 {
@@ -1030,88 +1117,12 @@ func (x *Vector_3) GetZ() float32 {
 	return 0
 }
 
-type WorldTile struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Position      *Vector_3              `protobuf:"bytes,1,opt,name=position,proto3" json:"position,omitempty"`
-	Rotation      *Vector_3              `protobuf:"bytes,2,opt,name=rotation,proto3" json:"rotation,omitempty"`
-	Scale         *Vector_3              `protobuf:"bytes,3,opt,name=scale,proto3" json:"scale,omitempty"`
-	Type          TileType               `protobuf:"varint,4,opt,name=type,proto3,enum=gamepacket.TileType" json:"type,omitempty"`
-	IsScalable    bool                   `protobuf:"varint,5,opt,name=isScalable,proto3" json:"isScalable,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WorldTile) Reset() {
-	*x = WorldTile{}
-	mi := &file_gamepacket_proto_msgTypes[16]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WorldTile) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WorldTile) ProtoMessage() {}
-
-func (x *WorldTile) ProtoReflect() protoreflect.Message {
-	mi := &file_gamepacket_proto_msgTypes[16]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WorldTile.ProtoReflect.Descriptor instead.
-func (*WorldTile) Descriptor() ([]byte, []int) {
-	return file_gamepacket_proto_rawDescGZIP(), []int{16}
-}
-
-func (x *WorldTile) GetPosition() *Vector_3 {
-	if x != nil {
-		return x.Position
-	}
-	return nil
-}
-
-func (x *WorldTile) GetRotation() *Vector_3 {
-	if x != nil {
-		return x.Rotation
-	}
-	return nil
-}
-
-func (x *WorldTile) GetScale() *Vector_3 {
-	if x != nil {
-		return x.Scale
-	}
-	return nil
-}
-
-func (x *WorldTile) GetType() TileType {
-	if x != nil {
-		return x.Type
-	}
-	return TileType_ROAD_LANE
-}
-
-func (x *WorldTile) GetIsScalable() bool {
-	if x != nil {
-		return x.IsScalable
-	}
-	return false
-}
-
 var File_gamepacket_proto protoreflect.FileDescriptor
 
 const file_gamepacket_proto_rawDesc = "" +
 	"\n" +
 	"\x10gamepacket.proto\x12\n" +
-	"gamepacket\"\xbe\b\n" +
+	"gamepacket\"\xa9\b\n" +
 	"\n" +
 	"GamePacket\x12\x10\n" +
 	"\x03Seq\x18\x01 \x01(\rR\x03Seq\x12H\n" +
@@ -1127,9 +1138,9 @@ const file_gamepacket_proto_rawDesc = "" +
 	" \x01(\v2\x1e.gamepacket.UsernameSubmissionR\x12UsernameSubmission\x12H\n" +
 	"\x10UsernameResponse\x18\v \x01(\v2\x1c.gamepacket.UsernameResponseR\x10UsernameResponse\x12Q\n" +
 	"\x13ReconnectionRequest\x18\f \x01(\v2\x1f.gamepacket.ReconnectionRequestR\x13ReconnectionRequest\x12T\n" +
-	"\x14ReconnectionResponse\x18\r \x01(\v2 .gamepacket.ReconnectionResponseR\x14ReconnectionResponse\x123\n" +
-	"\tWorldTile\x18\x0e \x01(\v2\x15.gamepacket.WorldTileR\tWorldTile\x123\n" +
-	"\tWorldData\x18\x0f \x01(\v2\x15.gamepacket.WorldDataR\tWorldData\x12<\n" +
+	"\x14ReconnectionResponse\x18\r \x01(\v2 .gamepacket.ReconnectionResponseR\x14ReconnectionResponse\x12$\n" +
+	"\x04Tile\x18\x0e \x01(\v2\x10.gamepacket.TileR\x04Tile\x12-\n" +
+	"\aTileSet\x18\x0f \x01(\v2\x13.gamepacket.TileSetR\aTileSet\x12<\n" +
 	"\fServerStatus\x18c \x01(\v2\x18.gamepacket.ServerStatusR\fServerStatus\"2\n" +
 	"\x10HandshakeRequest\x12\x1e\n" +
 	"\n" +
@@ -1174,27 +1185,29 @@ const file_gamepacket_proto_rawDesc = "" +
 	"\bclientId\x18\x01 \x01(\tR\bclientId\"D\n" +
 	"\fServerStatus\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1a\n" +
-	"\bclientId\x18\x02 \x01(\tR\bclientId\"W\n" +
-	"\tWorldData\x12+\n" +
-	"\x05tiles\x18\x01 \x03(\v2\x15.gamepacket.WorldTileR\x05tiles\x12\x1d\n" +
+	"\bclientId\x18\x02 \x01(\tR\bclientId\"P\n" +
+	"\aTileSet\x12&\n" +
+	"\x05tiles\x18\x02 \x03(\v2\x10.gamepacket.TileR\x05tiles\x12\x1d\n" +
 	"\n" +
-	"world_size\x18\x02 \x01(\x05R\tworldSize\"4\n" +
+	"world_size\x18\x03 \x01(\x05R\tworldSize\"\xf8\x01\n" +
+	"\x04Tile\x12\x16\n" +
+	"\x06tileId\x18\x01 \x01(\tR\x06tileId\x120\n" +
+	"\bposition\x18\x02 \x01(\v2\x14.gamepacket.Vector_3R\bposition\x120\n" +
+	"\brotation\x18\x03 \x01(\v2\x14.gamepacket.Vector_3R\brotation\x12*\n" +
+	"\x05scale\x18\x04 \x01(\v2\x14.gamepacket.Vector_3R\x05scale\x12(\n" +
+	"\x04type\x18\x05 \x01(\x0e2\x14.gamepacket.TileTypeR\x04type\x12\x1e\n" +
+	"\n" +
+	"isScalable\x18\x06 \x01(\bR\n" +
+	"isScalable\"4\n" +
 	"\bVector_3\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x02R\x01x\x12\f\n" +
 	"\x01y\x18\x02 \x01(\x02R\x01y\x12\f\n" +
-	"\x01z\x18\x03 \x01(\x02R\x01z\"\xe5\x01\n" +
-	"\tWorldTile\x120\n" +
-	"\bposition\x18\x01 \x01(\v2\x14.gamepacket.Vector_3R\bposition\x120\n" +
-	"\brotation\x18\x02 \x01(\v2\x14.gamepacket.Vector_3R\brotation\x12*\n" +
-	"\x05scale\x18\x03 \x01(\v2\x14.gamepacket.Vector_3R\x05scale\x12(\n" +
-	"\x04type\x18\x04 \x01(\x0e2\x14.gamepacket.TileTypeR\x04type\x12\x1e\n" +
-	"\n" +
-	"isScalable\x18\x05 \x01(\bR\n" +
-	"isScalable*7\n" +
-	"\bTileType\x12\r\n" +
-	"\tROAD_LANE\x10\x00\x12\x11\n" +
-	"\rCROSS_SECTION\x10\x01\x12\t\n" +
-	"\x05GRASS\x10\x02B\x15Z\x13gosocket/gamepacketb\x06proto3"
+	"\x01z\x18\x03 \x01(\x02R\x01z*A\n" +
+	"\bTileType\x12\b\n" +
+	"\x04None\x10\x00\x12\r\n" +
+	"\tROAD_LANE\x10\x01\x12\x11\n" +
+	"\rCROSS_SECTION\x10\x02\x12\t\n" +
+	"\x05GRASS\x10\x03B\x15Z\x13gosocket/gamepacketb\x06proto3"
 
 var (
 	file_gamepacket_proto_rawDescOnce sync.Once
@@ -1226,9 +1239,9 @@ var file_gamepacket_proto_goTypes = []any{
 	(*Heartbeat)(nil),            // 12: gamepacket.Heartbeat
 	(*HeartbeatAck)(nil),         // 13: gamepacket.HeartbeatAck
 	(*ServerStatus)(nil),         // 14: gamepacket.ServerStatus
-	(*WorldData)(nil),            // 15: gamepacket.WorldData
-	(*Vector_3)(nil),             // 16: gamepacket.Vector_3
-	(*WorldTile)(nil),            // 17: gamepacket.WorldTile
+	(*TileSet)(nil),              // 15: gamepacket.TileSet
+	(*Tile)(nil),                 // 16: gamepacket.Tile
+	(*Vector_3)(nil),             // 17: gamepacket.Vector_3
 }
 var file_gamepacket_proto_depIdxs = []int32{
 	2,  // 0: gamepacket.GamePacket.HandshakeRequest:type_name -> gamepacket.HandshakeRequest
@@ -1243,18 +1256,18 @@ var file_gamepacket_proto_depIdxs = []int32{
 	6,  // 9: gamepacket.GamePacket.UsernameResponse:type_name -> gamepacket.UsernameResponse
 	7,  // 10: gamepacket.GamePacket.ReconnectionRequest:type_name -> gamepacket.ReconnectionRequest
 	8,  // 11: gamepacket.GamePacket.ReconnectionResponse:type_name -> gamepacket.ReconnectionResponse
-	17, // 12: gamepacket.GamePacket.WorldTile:type_name -> gamepacket.WorldTile
-	15, // 13: gamepacket.GamePacket.WorldData:type_name -> gamepacket.WorldData
+	16, // 12: gamepacket.GamePacket.Tile:type_name -> gamepacket.Tile
+	15, // 13: gamepacket.GamePacket.TileSet:type_name -> gamepacket.TileSet
 	14, // 14: gamepacket.GamePacket.ServerStatus:type_name -> gamepacket.ServerStatus
 	11, // 15: gamepacket.LobbyJoinBroadcast.position:type_name -> gamepacket.ClientLobbyPosition
-	16, // 16: gamepacket.ClientPosition.position:type_name -> gamepacket.Vector_3
-	16, // 17: gamepacket.ClientPosition.velocity:type_name -> gamepacket.Vector_3
-	16, // 18: gamepacket.ClientLobbyPosition.position:type_name -> gamepacket.Vector_3
-	17, // 19: gamepacket.WorldData.tiles:type_name -> gamepacket.WorldTile
-	16, // 20: gamepacket.WorldTile.position:type_name -> gamepacket.Vector_3
-	16, // 21: gamepacket.WorldTile.rotation:type_name -> gamepacket.Vector_3
-	16, // 22: gamepacket.WorldTile.scale:type_name -> gamepacket.Vector_3
-	0,  // 23: gamepacket.WorldTile.type:type_name -> gamepacket.TileType
+	17, // 16: gamepacket.ClientPosition.position:type_name -> gamepacket.Vector_3
+	17, // 17: gamepacket.ClientPosition.velocity:type_name -> gamepacket.Vector_3
+	17, // 18: gamepacket.ClientLobbyPosition.position:type_name -> gamepacket.Vector_3
+	16, // 19: gamepacket.TileSet.tiles:type_name -> gamepacket.Tile
+	17, // 20: gamepacket.Tile.position:type_name -> gamepacket.Vector_3
+	17, // 21: gamepacket.Tile.rotation:type_name -> gamepacket.Vector_3
+	17, // 22: gamepacket.Tile.scale:type_name -> gamepacket.Vector_3
+	0,  // 23: gamepacket.Tile.type:type_name -> gamepacket.TileType
 	24, // [24:24] is the sub-list for method output_type
 	24, // [24:24] is the sub-list for method input_type
 	24, // [24:24] is the sub-list for extension type_name
