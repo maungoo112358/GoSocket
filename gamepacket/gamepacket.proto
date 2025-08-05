@@ -111,6 +111,8 @@ message Vector_3{
 enum TileType {
   None = 0;
   ROAD_LANE = 1;
-  CROSS_INTERSECTION = 2;
-  GRASS = 3;
+  CROSS_INTERSECTION_2_WAYS = 2;
+	CROSS_INTERSECTION_3_WAYS = 3;
+	CROSS_INTERSECTION_4_WAYS = 4;
+  GRASS = 5;
 }

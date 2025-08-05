@@ -5,9 +5,7 @@ import (
 	"gosocket/gamepacket"
 	"gosocket/internal/client"
 	"gosocket/internal/utils"
-	"math/rand"
 	"net"
-	"time"
 )
 
 type TileType int
@@ -16,7 +14,9 @@ const (
 	NONE         TileType = iota
 	ROAD_LANE_NS          // North-South road
 	ROAD_LANE_EW          // East-West road
-	CROSS_INTERSECTION
+	CROSS_INTERSECTION_2_WAYS
+	CROSS_INTERSECTION_3_WAYS
+	CROSS_INTERSECTION_4_WAYS
 	GRASS
 )
 
@@ -58,8 +58,6 @@ type WFCGrid struct {
 type AdjacencyRules map[TileType]map[Direction][]TileType
 
 type TileGenerationModule struct{}
-
-var allTileTypes = []TileType{GRASS, ROAD_LANE_NS, ROAD_LANE_EW, CROSS_INTERSECTION}
 
 var tileProperties map[TileType]TileInfo
 var adjacencyRules AdjacencyRules
@@ -106,93 +104,6 @@ func (m *TileGenerationModule) GenerateTileForClient(conn net.PacketConn, c inte
 	} else {
 		fmt.Printf("🌍 Sent %d tiles to %s\n", len(tiles), clientInfo.PublicID)
 	}
-}
-
-func initializeTileProperties() map[TileType]TileInfo {
-	tileProperties := make(map[TileType]TileInfo)
-
-	tileProperties[GRASS] = TileInfo{
-		TileType:    GRASS,
-		LogicalSize: 1,
-		Connections: map[Direction]bool{
-			NORTH: true,
-			SOUTH: true,
-			EAST:  true,
-			WEST:  true,
-		},
-	}
-
-	tileProperties[ROAD_LANE_NS] = TileInfo{
-		TileType:    ROAD_LANE_NS,
-		LogicalSize: 2,
-		Connections: map[Direction]bool{
-			NORTH: true,
-			SOUTH: true,
-			EAST:  false,
-			WEST:  false,
-		},
-	}
-
-	tileProperties[ROAD_LANE_EW] = TileInfo{
-		TileType:    ROAD_LANE_EW,
-		LogicalSize: 2,
-		Connections: map[Direction]bool{
-			NORTH: false,
-			SOUTH: false,
-			EAST:  true,
-			WEST:  true,
-		},
-	}
-
-	tileProperties[CROSS_INTERSECTION] = TileInfo{
-		TileType:    CROSS_INTERSECTION,
-		LogicalSize: 2,
-		Connections: map[Direction]bool{
-			NORTH: true,
-			SOUTH: true,
-			EAST:  true,
-			WEST:  true,
-		},
-	}
-
-	return tileProperties
-}
-
-func initializeAdjacencyRules() AdjacencyRules {
-	rules := make(AdjacencyRules)
-
-	// GRASS - can connect to anything in all directions
-	rules[GRASS] = map[Direction][]TileType{
-		NORTH: {GRASS, ROAD_LANE_NS, ROAD_LANE_EW, CROSS_INTERSECTION},
-		SOUTH: {GRASS, ROAD_LANE_NS, ROAD_LANE_EW, CROSS_INTERSECTION},
-		EAST:  {GRASS, ROAD_LANE_NS, ROAD_LANE_EW, CROSS_INTERSECTION},
-		WEST:  {GRASS, ROAD_LANE_NS, ROAD_LANE_EW, CROSS_INTERSECTION},
-	}
-
-	// ROAD_LANE_NS - connects only north/south to roads/intersections
-	rules[ROAD_LANE_NS] = map[Direction][]TileType{
-		NORTH: {ROAD_LANE_NS, CROSS_INTERSECTION, GRASS},
-		SOUTH: {ROAD_LANE_NS, CROSS_INTERSECTION, GRASS},
-		EAST:  {GRASS}, // Only grass can connect from the sides
-		WEST:  {GRASS},
-	}
-
-	// ROAD_LANE_EW - connects only east/west to roads/intersections
-	rules[ROAD_LANE_EW] = map[Direction][]TileType{
-		NORTH: {GRASS}, // Only grass can connect from top/bottom
-		SOUTH: {GRASS},
-		EAST:  {ROAD_LANE_EW, CROSS_INTERSECTION, GRASS},
-		WEST:  {ROAD_LANE_EW, CROSS_INTERSECTION, GRASS},
-	}
-
-	// CROSS_INTERSECTION - connects to roads/intersections in all directions
-	rules[CROSS_INTERSECTION] = map[Direction][]TileType{
-		NORTH: {ROAD_LANE_NS, CROSS_INTERSECTION, GRASS},
-		SOUTH: {ROAD_LANE_NS, CROSS_INTERSECTION, GRASS},
-		EAST:  {ROAD_LANE_EW, CROSS_INTERSECTION, GRASS},
-		WEST:  {ROAD_LANE_EW, CROSS_INTERSECTION, GRASS},
-	}
-	return rules
 }
 
 func createWFCGrid(width, height int) *WFCGrid {
@@ -292,10 +203,6 @@ func getValidNeighborTiles(tileType TileType, direction Direction) []TileType {
 	}
 
 	return validTiles
-}
-
-func getAllTileTypes() []TileType {
-	return []TileType{GRASS, ROAD_LANE_NS, ROAD_LANE_EW, CROSS_INTERSECTION}
 }
 
 func canTileConnect(tile1, tile2 TileType, direction Direction) bool {
@@ -426,47 +333,6 @@ func removePossibilities(cell *WFCCell, tileType TileType) bool {
 	}
 
 	return true
-}
-
-func generateStaticTestTiles() []*gamepacket.Tile {
-	tiles := make([]*gamepacket.Tile, 0)
-
-	tiles = append(tiles, &gamepacket.Tile{
-		TileId:     generateTileID(),
-		Position:   &gamepacket.Vector_3{X: 0, Y: 0, Z: 0},
-		Rotation:   &gamepacket.Vector_3{X: 0, Y: 0, Z: 0},
-		Scale:      &gamepacket.Vector_3{X: 1, Y: 1, Z: 1},
-		Type:       gamepacket.TileType_CROSS_INTERSECTION,
-		IsScalable: false,
-	})
-
-	tiles = append(tiles, &gamepacket.Tile{
-		TileId:     generateTileID(),
-		Position:   &gamepacket.Vector_3{X: 20, Y: 0, Z: 0},
-		Rotation:   &gamepacket.Vector_3{X: 0, Y: 0, Z: 0},
-		Scale:      &gamepacket.Vector_3{X: 1, Y: 1, Z: 1},
-		Type:       gamepacket.TileType_ROAD_LANE,
-		IsScalable: false,
-	})
-
-	tiles = append(tiles, &gamepacket.Tile{
-		TileId:     generateTileID(),
-		Position:   &gamepacket.Vector_3{X: 10, Y: 0, Z: 15},
-		Rotation:   &gamepacket.Vector_3{X: 0, Y: 0, Z: 0},
-		Scale:      &gamepacket.Vector_3{X: 1, Y: 1, Z: 1},
-		Type:       gamepacket.TileType_GRASS,
-		IsScalable: false,
-	})
-
-	fmt.Printf("📦 Generated %d static test tiles\n", len(tiles))
-	return tiles
-}
-
-func generateTileID() string {
-	timeStamp := time.Now().UnixNano()
-	randNum := uint32(rand.Intn(100000))
-
-	return fmt.Sprintf("tile_%d_%d", timeStamp, randNum)
 }
 
 func (m *TileGenerationModule) Shutdown() {
