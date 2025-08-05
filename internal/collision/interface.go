@@ -1,11 +1,10 @@
-package main
+package collision
 
 import (
 	"gosocket/gamepacket"
 	"net"
 )
 
-// Pure service interface
 type CollisionService interface {
 	CheckPlayerCollision(clientID string, position *gamepacket.Vector_3) bool
 	CheckBuildingCollision(buildingID string, position *gamepacket.Vector_3) bool

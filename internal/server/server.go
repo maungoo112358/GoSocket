@@ -1,9 +1,11 @@
-package main
+package server
 
 import (
 	"context"
 	"fmt"
 	"gosocket/gamepacket"
+	"gosocket/internal/client"
+	"gosocket/internal/registry"
 	"net"
 	"os"
 	"os/signal"
@@ -152,7 +154,7 @@ func (s *Server) processPacket(work PacketWork) {
 	}
 
 	// Route packet to appropriate module
-	dispatchPacket(s.conn, work.Addr, &packet)
+	registry.DispatchPacket(s.conn, work.Addr, &packet)
 }
 
 func (s *Server) SetupGracefulShutdown() {
@@ -164,14 +166,14 @@ func (s *Server) SetupGracefulShutdown() {
 		fmt.Println("🛑 Shutdown signal received...")
 		s.Shutdown()
 
-		shutdownModules()
+		registry.ShutdownModules()
 
 		s.cancel()
 	}()
 }
 
 func (s *Server) Shutdown() {
-	clients := GetAllClients()
+	clients := client.GetAllClients()
 	if len(clients) == 0 {
 		return
 	}
@@ -192,12 +194,12 @@ func (s *Server) Shutdown() {
 
 	// Send to all clients concurrently
 	var wg sync.WaitGroup
-	for _, client := range clients {
+	for _, c := range clients {
 		wg.Add(1)
-		go func(c *ClientInfo) {
+		go func(cl *client.ClientInfo) {
 			defer wg.Done()
-			s.conn.WriteTo(data, c.Address)
-		}(client)
+			s.conn.WriteTo(data, cl.Address)
+		}(c)
 	}
 
 	wg.Wait()
@@ -205,13 +207,13 @@ func (s *Server) Shutdown() {
 }
 
 func (s *Server) StartHeartbeatChecker() {
-	go StartHeartbeatChecker(s.conn)
+	go client.StartHeartbeatChecker(s.conn)
 }
 
 func (s *Server) Close() {
 	s.cancel()
 
-	shutdownModules()
+	registry.ShutdownModules()
 
 	if s.conn != nil {
 		s.conn.Close()

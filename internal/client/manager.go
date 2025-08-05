@@ -1,10 +1,10 @@
-package main
+package client
 
 import (
 	"fmt"
-	"gosocket/gamepacket"
-	"math/rand"
+	"gosocket/internal/utils"
 	"net"
+	"strings"
 	"sync"
 	"time"
 )
@@ -14,31 +14,6 @@ const (
 	ClientTimeout     = 30 * time.Second
 	PendingTimeout    = 30 * time.Second
 )
-
-// ClientInfo represents an active client connection
-type ClientInfo struct {
-	PrivateID     string
-	PublicID      string
-	Name          string
-	Address       net.Addr
-	LastHeartbeat time.Time
-	ConnectedAt   time.Time
-	ColorHex      string
-	SessionToken  string
-	InLobby       bool
-}
-
-// PendingClient represents a client that hasn't completed username submission
-type PendingClient struct {
-	TempID    string
-	Address   net.Addr
-	CreatedAt time.Time
-}
-
-// LobbyPosition tracks where a client is positioned in the lobby
-type LobbyPosition struct {
-	X, Y, Z float32
-}
 
 // Client storage
 var (
@@ -54,7 +29,6 @@ var (
 
 // === Public API ===
 
-// GetAllClients returns a copy of all active clients
 func GetAllClients() []*ClientInfo {
 	activeClientsMutex.RLock()
 	defer activeClientsMutex.RUnlock()
@@ -66,26 +40,23 @@ func GetAllClients() []*ClientInfo {
 	return clients
 }
 
-// GetClientCount returns the number of active clients
 func GetClientCount() int {
 	activeClientsMutex.RLock()
 	defer activeClientsMutex.RUnlock()
 	return len(activeClients)
 }
 
-// GetPendingClientCount returns the number of pending clients
 func GetPendingClientCount() int {
 	pendingClientsMutex.RLock()
 	defer pendingClientsMutex.RUnlock()
 	return len(pendingClients)
 }
 
-// AddClient registers a new active client
 func AddClient(privateID, publicID, name string, addr net.Addr) {
 	activeClientsMutex.Lock()
 	defer activeClientsMutex.Unlock()
 
-	sessionToken := GenerateSessionToken()
+	sessionToken := utils.GenerateSessionToken()
 	now := time.Now()
 
 	activeClients[privateID] = &ClientInfo{
@@ -102,7 +73,7 @@ func AddClient(privateID, publicID, name string, addr net.Addr) {
 	fmt.Printf("✅ Client added: %s from %s (ID: %s)\n", publicID, addr, privateID)
 }
 
-// AddClientDirect adds a pre-constructed client (for reconnections)
+// adds a pre-constructed client (for reconnections)
 func AddClientDirect(client *ClientInfo) {
 	activeClientsMutex.Lock()
 	defer activeClientsMutex.Unlock()
@@ -111,7 +82,6 @@ func AddClientDirect(client *ClientInfo) {
 	fmt.Printf("✅ Client restored: %s (ID: %s)\n", client.PublicID, client.PrivateID)
 }
 
-// RemoveClient disconnects and cleans up a client
 func RemoveClient(conn net.PacketConn, privateID string) *ClientInfo {
 	client := removeFromActiveClients(privateID)
 	if client == nil {
@@ -122,14 +92,13 @@ func RemoveClient(conn net.PacketConn, privateID string) *ClientInfo {
 	cleanupClientData(client)
 
 	if client.WasInLobby() {
-		broadcastPlayerLeft(conn, client)
+		BroadcastPlayerLeft(conn, client)
 	}
 
 	fmt.Printf("❌ Client removed: %s (%s)\n", client.Name, client.PublicID)
 	return client
 }
 
-// UpdateHeartbeat updates the last heartbeat time for a client
 func UpdateHeartbeat(privateID string) bool {
 	activeClientsMutex.Lock()
 	defer activeClientsMutex.Unlock()
@@ -143,7 +112,6 @@ func UpdateHeartbeat(privateID string) bool {
 	return true
 }
 
-// FindClientByPublicID searches for an active client by their public ID
 func FindClientByPublicID(publicID string) *ClientInfo {
 	activeClientsMutex.RLock()
 	defer activeClientsMutex.RUnlock()
@@ -156,7 +124,6 @@ func FindClientByPublicID(publicID string) *ClientInfo {
 	return nil
 }
 
-// SetClientLobbyStatus updates whether a client is in the lobby
 func SetClientLobbyStatus(privateID string, inLobby bool) {
 	activeClientsMutex.Lock()
 	defer activeClientsMutex.Unlock()
@@ -169,7 +136,7 @@ func SetClientLobbyStatus(privateID string, inLobby bool) {
 
 // === Pending Client Management ===
 
-// AddPendingClient adds a client awaiting username submission
+// adds a client awaiting username submission
 func AddPendingClient(tempID string, addr net.Addr) {
 	pendingClientsMutex.Lock()
 	defer pendingClientsMutex.Unlock()
@@ -183,7 +150,6 @@ func AddPendingClient(tempID string, addr net.Addr) {
 	fmt.Printf("📝 Pending client added: %s from %s\n", tempID, addr)
 }
 
-// RemovePendingClient removes a pending client by address
 func RemovePendingClient(addr net.Addr) {
 	pendingClientsMutex.Lock()
 	defer pendingClientsMutex.Unlock()
@@ -199,7 +165,6 @@ func RemovePendingClient(addr net.Addr) {
 
 // === Lobby Position Management ===
 
-// GetLobbyPosition returns a client's lobby position
 func GetLobbyPosition(publicID string) (LobbyPosition, bool) {
 	lobbyPositionsMutex.RLock()
 	defer lobbyPositionsMutex.RUnlock()
@@ -208,7 +173,6 @@ func GetLobbyPosition(publicID string) (LobbyPosition, bool) {
 	return pos, exists
 }
 
-// SetLobbyPosition sets a client's lobby position
 func SetLobbyPosition(publicID string, position LobbyPosition) {
 	lobbyPositionsMutex.Lock()
 	defer lobbyPositionsMutex.Unlock()
@@ -216,7 +180,6 @@ func SetLobbyPosition(publicID string, position LobbyPosition) {
 	lobbyPositions[publicID] = position
 }
 
-// GetAllLobbyPositions returns all lobby positions
 func GetAllLobbyPositions() map[string]LobbyPosition {
 	lobbyPositionsMutex.RLock()
 	defer lobbyPositionsMutex.RUnlock()
@@ -230,7 +193,6 @@ func GetAllLobbyPositions() map[string]LobbyPosition {
 
 // === Heartbeat System ===
 
-// StartHeartbeatChecker begins monitoring client heartbeats
 func StartHeartbeatChecker(conn net.PacketConn) {
 	ticker := time.NewTicker(HeartbeatInterval)
 
@@ -244,13 +206,6 @@ func StartHeartbeatChecker(conn net.PacketConn) {
 	}()
 
 	fmt.Println("💓 Heartbeat checker started")
-}
-
-// === Helper Methods ===
-
-// WasInLobby checks if client was actively in lobby
-func (c *ClientInfo) WasInLobby() bool {
-	return c.InLobby && c.ColorHex != ""
 }
 
 // === Internal Functions ===
@@ -274,7 +229,6 @@ func cleanupClientData(client *ClientInfo) {
 		return
 	}
 
-	// Remove lobby position for clients who weren't in lobby
 	lobbyPositionsMutex.Lock()
 	delete(lobbyPositions, client.PublicID)
 	lobbyPositionsMutex.Unlock()
@@ -286,7 +240,6 @@ func checkAndRemoveTimedOutClients(conn net.PacketConn) {
 	now := time.Now()
 	var timedOutClients []string
 
-	// Find timed out clients
 	activeClientsMutex.RLock()
 	for privateID, client := range activeClients {
 		if now.Sub(client.LastHeartbeat) > ClientTimeout {
@@ -338,15 +291,33 @@ func cleanupExpiredPendingClients() {
 	}
 }
 
-func broadcastPlayerLeft(conn net.PacketConn, client *ClientInfo) {
-	leavePacket := &gamepacket.GamePacket{
-		Seq: uint32(rand.Intn(10000)),
-		ServerStatus: &gamepacket.ServerStatus{
-			Message:  fmt.Sprintf("Player %s left the lobby", client.PublicID),
-			ClientId: client.PublicID,
-		},
+func GetAvailableColor() (string, bool) {
+	activeClients := GetAllClients()
+	usedColors := make([]string, 0, len(activeClients))
+	for _, c := range activeClients {
+		if c.ColorHex != "" {
+			usedColors = append(usedColors, c.ColorHex)
+		}
+	}
+	return utils.GetAvailableColor(usedColors)
+}
+
+func CleanupUnusedIDs() {
+	activeClients := GetAllClients()
+
+	activePrivateIDs := make(map[string]struct{})
+	activePublicIDs := make(map[string]struct{})
+
+	for _, c := range activeClients {
+		activePrivateIDs[strings.ToLower(c.PrivateID)] = struct{}{}
+		activePublicIDs[strings.ToLower(c.PublicID)] = struct{}{}
 	}
 
-	BroadcastToAll(conn, leavePacket, client.PrivateID)
-	fmt.Printf("📤 Broadcast: %s left the lobby\n", client.PublicID)
+	privateCleanedCount := utils.CleanupPrivateIDs(activePrivateIDs)
+	publicCleanedCount := utils.CleanupPublicIDs(activePublicIDs)
+
+	if privateCleanedCount > 0 || publicCleanedCount > 0 {
+		fmt.Printf("🧹 Cleaned up %d private IDs, %d public IDs\n",
+			privateCleanedCount, publicCleanedCount)
+	}
 }

@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	crand "crypto/rand"
@@ -178,47 +178,32 @@ func GetIDStats() (privateCount, publicCount int) {
 	return len(usedPrivateIDs), len(usedPublicIDs)
 }
 
-// CleanupUnusedIDs removes IDs that are no longer associated with active clients
-// This should be called periodically to prevent memory leaks
-func CleanupUnusedIDs() {
-	activeClients := GetAllClients()
-
-	// Build sets of currently used IDs
-	activePrivateIDs := make(map[string]struct{})
-	activePublicIDs := make(map[string]struct{})
-
-	for _, client := range activeClients {
-		activePrivateIDs[strings.ToLower(client.PrivateID)] = struct{}{}
-		activePublicIDs[strings.ToLower(client.PublicID)] = struct{}{}
-	}
-
+func CleanupPrivateIDs(activePrivateIDs map[string]struct{}) int {
 	idStoreMutex.Lock()
 	defer idStoreMutex.Unlock()
 
-	// Count what we're cleaning up
-	privateCleanedCount := 0
-	publicCleanedCount := 0
-
-	// Clean up unused private IDs
+	cleanedCount := 0
 	for privateID := range usedPrivateIDs {
 		if _, isActive := activePrivateIDs[privateID]; !isActive {
 			delete(usedPrivateIDs, privateID)
-			privateCleanedCount++
+			cleanedCount++
 		}
 	}
+	return cleanedCount
+}
 
-	// Clean up unused public IDs
+func CleanupPublicIDs(activePublicIDs map[string]struct{}) int {
+	idStoreMutex.Lock()
+	defer idStoreMutex.Unlock()
+
+	cleanedCount := 0
 	for publicID := range usedPublicIDs {
 		if _, isActive := activePublicIDs[publicID]; !isActive {
 			delete(usedPublicIDs, publicID)
-			publicCleanedCount++
+			cleanedCount++
 		}
 	}
-
-	if privateCleanedCount > 0 || publicCleanedCount > 0 {
-		fmt.Printf("🧹 Cleaned up %d private IDs, %d public IDs\n",
-			privateCleanedCount, publicCleanedCount)
-	}
+	return cleanedCount
 }
 
 // === Initialization ===

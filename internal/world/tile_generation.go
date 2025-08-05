@@ -1,8 +1,10 @@
-package main
+package world
 
 import (
 	"fmt"
 	"gosocket/gamepacket"
+	"gosocket/internal/client"
+	"gosocket/internal/utils"
 	"math/rand"
 	"net"
 	"time"
@@ -63,18 +65,9 @@ var tileProperties map[TileType]TileInfo
 var adjacencyRules AdjacencyRules
 
 func NewTileGenerationModule() *TileGenerationModule {
-	RegisterModule(ModuleInfo{
-		Name:         TileGenerationModuleEnum,
-		Type:         NonCritical,
-		Dependencies: []ModuleEnum{},
-		SubModules:   []ModuleEnum{},
-	})
-
 	service := &TileGenerationModule{}
-	RegisterService(TileGenerationModuleEnum, service)
 
 	tileProperties = initializeTileProperties()
-
 	adjacencyRules = initializeAdjacencyRules()
 
 	return service
@@ -88,22 +81,31 @@ func (m *TileGenerationModule) Handle(conn net.PacketConn, addr net.Addr, pkt *g
 	// Not used since CanHandle returns false
 }
 
-func (m *TileGenerationModule) GenerateTileForClient(conn net.PacketConn, client *ClientInfo) {
-	fmt.Printf("🌍 Generating world for client: %s\n", client.PublicID)
+func (m *TileGenerationModule) GenerateTileForClient(conn net.PacketConn, c interface{}) {
+	clientInfo, ok := c.(*client.ClientInfo)
+	if !ok {
+		fmt.Printf("❌ Invalid client type for tile generation\n")
+		return
+	}
 
-	// packet := &gamepacket.GamePacket{
-	// 	Seq: generateRandomSeq(),
-	// 	TileSet: &gamepacket.TileSet{
-	// 		Tiles:     tiles,
-	// 		WorldSize: int32(len(tiles)),
-	// 	},
-	// }
+	fmt.Printf("🌍 Generating world for client: %s\n", clientInfo.PublicID)
 
-	// if err := SendToClient(conn, packet, client); err != nil {
-	// 	fmt.Printf("❌ Failed to send world tiles to %s: %v\n", client.PublicID, err)
-	// } else {
-	// 	fmt.Printf("🌍 Sent %d tiles to %s\n", len(tiles), client.PublicID)
-	// }
+	// Generate static test tiles
+	tiles := generateStaticTestTiles()
+
+	packet := &gamepacket.GamePacket{
+		Seq: utils.GenerateRandomSeq(),
+		TileSet: &gamepacket.TileSet{
+			Tiles:     tiles,
+			WorldSize: int32(len(tiles)),
+		},
+	}
+
+	if err := client.SendToClient(conn, packet, clientInfo); err != nil {
+		fmt.Printf("❌ Failed to send world tiles to %s: %v\n", clientInfo.PublicID, err)
+	} else {
+		fmt.Printf("🌍 Sent %d tiles to %s\n", len(tiles), clientInfo.PublicID)
+	}
 }
 
 func initializeTileProperties() map[TileType]TileInfo {
@@ -426,10 +428,46 @@ func removePossibilities(cell *WFCCell, tileType TileType) bool {
 	return true
 }
 
+func generateStaticTestTiles() []*gamepacket.Tile {
+	tiles := make([]*gamepacket.Tile, 0)
+
+	tiles = append(tiles, &gamepacket.Tile{
+		TileId:     generateTileID(),
+		Position:   &gamepacket.Vector_3{X: 0, Y: 0, Z: 0},
+		Rotation:   &gamepacket.Vector_3{X: 0, Y: 0, Z: 0},
+		Scale:      &gamepacket.Vector_3{X: 1, Y: 1, Z: 1},
+		Type:       gamepacket.TileType_CROSS_INTERSECTION,
+		IsScalable: false,
+	})
+
+	tiles = append(tiles, &gamepacket.Tile{
+		TileId:     generateTileID(),
+		Position:   &gamepacket.Vector_3{X: 20, Y: 0, Z: 0},
+		Rotation:   &gamepacket.Vector_3{X: 0, Y: 0, Z: 0},
+		Scale:      &gamepacket.Vector_3{X: 1, Y: 1, Z: 1},
+		Type:       gamepacket.TileType_ROAD_LANE,
+		IsScalable: false,
+	})
+
+	tiles = append(tiles, &gamepacket.Tile{
+		TileId:     generateTileID(),
+		Position:   &gamepacket.Vector_3{X: 10, Y: 0, Z: 15},
+		Rotation:   &gamepacket.Vector_3{X: 0, Y: 0, Z: 0},
+		Scale:      &gamepacket.Vector_3{X: 1, Y: 1, Z: 1},
+		Type:       gamepacket.TileType_GRASS,
+		IsScalable: false,
+	})
+
+	fmt.Printf("📦 Generated %d static test tiles\n", len(tiles))
+	return tiles
+}
+
 func generateTileID() string {
 	timeStamp := time.Now().UnixNano()
 	randNum := uint32(rand.Intn(100000))
 
 	return fmt.Sprintf("tile_%d_%d", timeStamp, randNum)
+}
 
+func (m *TileGenerationModule) Shutdown() {
 }

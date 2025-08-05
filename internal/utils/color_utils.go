@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"math/rand"
@@ -18,14 +18,11 @@ var availableColors = []string{
 	"#f95c16", "#b9a01b", "#84eb5e", "#11ec6e", "#da3fe7",
 }
 
-func getAvailableColor() (string, bool) {
-	activeClientsMutex.RLock()
-	defer activeClientsMutex.RUnlock()
-
+func GetAvailableColor(usedColors []string) (string, bool) {
 	used := make(map[string]bool)
-	for _, client := range activeClients {
-		if client.ColorHex != "" {
-			used[client.ColorHex] = true
+	for _, color := range usedColors {
+		if color != "" {
+			used[color] = true
 		}
 	}
 
@@ -41,4 +38,13 @@ func getAvailableColor() (string, bool) {
 	}
 
 	return available[rand.Intn(len(available))], true
+}
+
+// GetRandomColor provides a fallback color when no colors are available
+func GetRandomColor() string {
+	colors := []string{
+		"#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF",
+		"#FFA500", "#800080", "#008000", "#000080", "#800000", "#808000",
+	}
+	return colors[rand.Intn(len(colors))]
 }

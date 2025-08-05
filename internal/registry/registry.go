@@ -1,8 +1,13 @@
-package main
+package registry
 
 import (
 	"fmt"
 	"gosocket/gamepacket"
+	"gosocket/internal/collision"
+	"gosocket/internal/connection"
+	"gosocket/internal/lobby"
+	"gosocket/internal/movement"
+	"gosocket/internal/world"
 	"net"
 )
 
@@ -35,7 +40,7 @@ type ModuleInfo struct {
 
 // Tile Generation Service Interface
 type TileGenerationService interface {
-	GenerateTileForClient(conn net.PacketConn, client *ClientInfo)
+	GenerateTileForClient(conn net.PacketConn, client interface{})
 }
 
 // Module registry
@@ -142,20 +147,67 @@ func getModuleTypeName(moduleType ModuleType) string {
 type ServerModule interface {
 	CanHandle(*gamepacket.GamePacket) bool
 	Handle(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket)
+	Shutdown()
 }
 
 var modules []ServerModule
 
 func init() {
-	movementModule := NewMovementModule()
-	worldGenerationModule := NewTileGenerationModule()
+	// Create all module instances
+	collisionModule := collision.NewCollisionModule()
+	movementModule := movement.NewMovementModule()
+	worldGenerationModule := world.NewTileGenerationModule()
+	connectionModule := connection.NewConnectionModule()
+	lobbyModule := lobby.NewLobbyModule()
 
+	// Register modules with metadata
+	RegisterModule(ModuleInfo{
+		Name:         CollisionModuleEnum,
+		Type:         NonCritical,
+		Dependencies: []ModuleEnum{MovementModuleEnum},
+		SubModules:   []ModuleEnum{},
+	})
+	RegisterModule(ModuleInfo{
+		Name:         MovementModuleEnum,
+		Type:         NonCritical,
+		Dependencies: []ModuleEnum{},
+		SubModules:   []ModuleEnum{},
+	})
+	RegisterModule(ModuleInfo{
+		Name:         ConnectionModuleEnum,
+		Type:         Critical,
+		Dependencies: []ModuleEnum{},
+		SubModules:   []ModuleEnum{},
+	})
+	RegisterModule(ModuleInfo{
+		Name:         LobbyModuleEnum,
+		Type:         Critical,
+		Dependencies: []ModuleEnum{},
+		SubModules:   []ModuleEnum{},
+	})
+	RegisterModule(ModuleInfo{
+		Name:         TileGenerationModuleEnum,
+		Type:         NonCritical,
+		Dependencies: []ModuleEnum{},
+		SubModules:   []ModuleEnum{},
+	})
+
+	// Register services
+	RegisterService(CollisionModuleEnum, collisionModule)
+	RegisterService(TileGenerationModuleEnum, worldGenerationModule)
+
+	// Wire up dependencies
+	movementModule.SetCollisionService(collisionModule)
+
+	// Set up module list for packet dispatching
 	modules = []ServerModule{
-		NewConnectionModule(),
-		NewLobbyModule(),
+		connectionModule,
+		lobbyModule,
 		movementModule,
 		worldGenerationModule,
 	}
+
+	// Start movement workers
 	movementModule.StartWorkers()
 
 	// Print module status after initialization
@@ -164,7 +216,7 @@ func init() {
 	fmt.Println()
 }
 
-func dispatchPacket(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) {
+func DispatchPacket(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePacket) {
 	for _, m := range modules {
 		if m.CanHandle(pkt) {
 			m.Handle(conn, addr, pkt)
@@ -174,14 +226,11 @@ func dispatchPacket(conn net.PacketConn, addr net.Addr, pkt *gamepacket.GamePack
 	fmt.Println("⚠️ No module handled packet")
 }
 
-func shutdownModules() {
+func ShutdownModules() {
 	fmt.Println("🛑 Shutting down all modules...")
 
 	for _, module := range modules {
-		if movementModule, ok := module.(*MovementModule); ok {
-			fmt.Println("🛑 Stopping movement workers...")
-			movementModule.StopWorkers()
-		}
+		module.Shutdown()
 	}
 
 	fmt.Println("✅ All modules shut down successfully")

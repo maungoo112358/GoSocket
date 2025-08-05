@@ -1,8 +1,9 @@
-package main
+package collision
 
 import (
 	"fmt"
 	"gosocket/gamepacket"
+	"gosocket/internal/client"
 	"math"
 	"net"
 	"time"
@@ -19,19 +20,11 @@ type CollisionModule struct {
 }
 
 func NewCollisionModule() *CollisionModule {
-	RegisterModule(ModuleInfo{
-		Name:         CollisionModuleEnum,
-		Type:         NonCritical,
-		Dependencies: []ModuleEnum{MovementModuleEnum}, // Add this
-		SubModules:   []ModuleEnum{},
-	})
-
 	service := &CollisionModule{
 		name:    "CollisionModule",
-		enabled: IsModuleEnabled(MovementModuleEnum), // Base on movement
+		enabled: true, // Assume enabled for now
 	}
 
-	RegisterService(CollisionModuleEnum, service) // Add this
 	return service
 }
 
@@ -40,7 +33,7 @@ func (c *CollisionModule) CheckPlayerCollision(clientID string, position *gamepa
 		return false
 	}
 
-	allPositions := GetAllLobbyPositions()
+	allPositions := client.GetAllLobbyPositions()
 	logFlag := false
 	playersInGrid := c.getPlayersInGrid(position, allPositions, clientID, &logFlag)
 
@@ -56,14 +49,14 @@ func (c *CollisionModule) CheckBuildingCollision(buildingID string, position *ga
 	return false // will add later
 }
 
-func (m *CollisionModule) getPlayersInGrid(centerPos *gamepacket.Vector_3, allPositions map[string]LobbyPosition, excludeClientID string, isLog *bool) map[string]LobbyPosition {
+func (m *CollisionModule) getPlayersInGrid(centerPos *gamepacket.Vector_3, allPositions map[string]client.LobbyPosition, excludeClientID string, isLog *bool) map[string]client.LobbyPosition {
 	gridHalfSize := float32(CollisionGridSize) / 2.0
 	gridMinX := centerPos.X - gridHalfSize
 	gridMaxX := centerPos.X + gridHalfSize
 	gridMinZ := centerPos.Z - gridHalfSize
 	gridMaxZ := centerPos.Z + gridHalfSize
 
-	playersInGrid := make(map[string]LobbyPosition)
+	playersInGrid := make(map[string]client.LobbyPosition)
 
 	for playerID, playerPos := range allPositions {
 		if playerID == excludeClientID {
@@ -75,22 +68,18 @@ func (m *CollisionModule) getPlayersInGrid(centerPos *gamepacket.Vector_3, allPo
 		}
 	}
 
-	shouldLog := true
-	if isLog != nil {
-		shouldLog = *isLog
-	}
-	if shouldLog {
+	if isLog == nil || *isLog {
 		fmt.Printf("🔍 Checking collision for %s: %d players in grid\n", excludeClientID, len(playersInGrid))
 	}
 
 	return playersInGrid
 }
 
-func (m *CollisionModule) isPositionInGrid(pos LobbyPosition, minX, maxX, minZ, maxZ float32) bool {
+func (m *CollisionModule) isPositionInGrid(pos client.LobbyPosition, minX, maxX, minZ, maxZ float32) bool {
 	return pos.X >= minX && pos.X <= maxX && pos.Z >= minZ && pos.Z <= maxZ
 }
 
-func (m *CollisionModule) hasCollision(pos1 *gamepacket.Vector_3, pos2 LobbyPosition) bool {
+func (m *CollisionModule) hasCollision(pos1 *gamepacket.Vector_3, pos2 client.LobbyPosition) bool {
 	dx := float64(pos1.X - pos2.X)
 	dz := float64(pos1.Z - pos2.Z)
 	distance := math.Sqrt(dx*dx + dz*dz)
@@ -100,7 +89,7 @@ func (m *CollisionModule) hasCollision(pos1 *gamepacket.Vector_3, pos2 LobbyPosi
 }
 
 func (m *CollisionModule) BroadcastRejection(conn net.PacketConn, clientID string, seq uint32) {
-	currentPos, exists := GetLobbyPosition(clientID)
+	currentPos, exists := client.GetLobbyPosition(clientID)
 	if !exists {
 		fmt.Printf("⚠️ Cannot broadcast position - no position found for %s\n", clientID)
 		return
@@ -119,6 +108,6 @@ func (m *CollisionModule) BroadcastRejection(conn net.PacketConn, clientID strin
 		},
 	}
 
-	BroadcastToAll(conn, correctionPacket, "")
+	client.BroadcastToAll(conn, correctionPacket, "")
 	fmt.Printf("🚫 Collision rejected: broadcasted current position for %s to all clients\n", clientID)
 }

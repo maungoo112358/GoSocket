@@ -1,12 +1,21 @@
-package main
+package movement
 
 import (
 	"fmt"
 	"gosocket/gamepacket"
+	"gosocket/internal/client"
+	"gosocket/internal/utils"
 	"net"
 	"sync"
 	"time"
 )
+
+// CollisionService interface for dependency injection
+type CollisionService interface {
+	CheckPlayerCollision(clientID string, position *gamepacket.Vector_3) bool
+	CheckBuildingCollision(buildingID string, position *gamepacket.Vector_3) bool
+	BroadcastRejection(conn net.PacketConn, clientID string, seq uint32)
+}
 
 const (
 	// Position validation bounds
@@ -55,21 +64,9 @@ type MovementRateLimiter struct {
 }
 
 func NewMovementModule() *MovementModule {
-	RegisterModule(ModuleInfo{
-		Name:         MovementModuleEnum,
-		Type:         NonCritical,
-		Dependencies: []ModuleEnum{},
-		SubModules:   []ModuleEnum{},
-	})
-
-	var collisionService CollisionService
-	if service := GetService(CollisionModuleEnum); service != nil {
-		collisionService = service.(CollisionService)
-	}
-
 	return &MovementModule{
 		name:             "MovementModule",
-		collisionService: collisionService,
+		collisionService: nil, // Will be set by registry
 		rateLimiter: &MovementRateLimiter{
 			clientLastSent: make(map[string]time.Time),
 			clientCounts:   make(map[string]int),
@@ -90,7 +87,6 @@ func (m *MovementModule) StartWorkers() {
 
 	m.isRunning = true
 
-	// Start worker goroutines
 	for i := 0; i < MaxMovementWorkers; i++ {
 		m.workerPool.Add(1)
 		go m.movementWorker(i)
@@ -110,7 +106,6 @@ func (m *MovementModule) StopWorkers() {
 	m.isRunning = false
 	close(m.stopChan)
 
-	// Wait for all workers to finish
 	m.workerPool.Wait()
 
 	fmt.Println("🛑 All movement workers stopped")
@@ -136,6 +131,15 @@ func (m *MovementModule) GetName() string {
 	return m.name
 }
 
+func (m *MovementModule) SetCollisionService(service CollisionService) {
+	m.collisionService = service
+}
+
+func (m *MovementModule) Shutdown() {
+	fmt.Println("🛑 Stopping movement workers...")
+	m.StopWorkers()
+}
+
 func (m *MovementModule) CanHandle(pkt *gamepacket.GamePacket) bool {
 	return pkt.GetClientPosition() != nil
 }
@@ -153,7 +157,6 @@ func (m *MovementModule) Handle(conn net.PacketConn, addr net.Addr, pkt *gamepac
 		clientPos: clientPos,
 	}
 
-	// Queue for concurrent processing
 	select {
 	case m.movementQueue <- req:
 	default:
@@ -200,8 +203,8 @@ func (m *MovementModule) validateMovementPacket(clientPos *gamepacket.ClientPosi
 }
 
 func (m *MovementModule) isValidClient(clientID string) bool {
-	client := FindClientByPublicID(clientID)
-	return client != nil && client.InLobby
+	c := client.FindClientByPublicID(clientID)
+	return c != nil && c.InLobby
 }
 
 func (m *MovementModule) isValidPosition(pos *gamepacket.Vector_3) bool {
@@ -262,25 +265,25 @@ func (m *MovementModule) processMovement(conn net.PacketConn, clientPos *gamepac
 }
 
 func (m *MovementModule) updateLobbyPosition(clientPos *gamepacket.ClientPosition) {
-	client := FindClientByPublicID(clientPos.ClientId)
-	if client != nil && client.InLobby {
-		newPos := LobbyPosition{
+	c := client.FindClientByPublicID(clientPos.ClientId)
+	if c != nil && c.InLobby {
+		newPos := client.LobbyPosition{
 			X: clientPos.Position.X,
 			Y: clientPos.Position.Y,
 			Z: clientPos.Position.Z,
 		}
-		SetLobbyPosition(clientPos.ClientId, newPos)
+		client.SetLobbyPosition(clientPos.ClientId, newPos)
 	}
 }
 
 func (m *MovementModule) broadcastMovement(conn net.PacketConn, clientPos *gamepacket.ClientPosition) {
 	packet := &gamepacket.GamePacket{
-		Seq:            generateRandomSeq(),
+		Seq:            utils.GenerateRandomSeq(),
 		ClientPosition: clientPos,
 	}
 
 	logFlag := false
-	BroadcastToAllExcept(conn, packet, clientPos.ClientId, &logFlag)
+	client.BroadcastToAllExcept(conn, packet, clientPos.ClientId, &logFlag)
 }
 
 // === Statistics ===
@@ -291,7 +294,7 @@ func (m *MovementModule) GetStats() MovementStats {
 
 	return MovementStats{
 		ActiveClients:   activeClients,
-		TotalClients:    GetClientCount(),
+		TotalClients:    client.GetClientCount(),
 		RateLimitWindow: MovementWindow,
 		MaxRate:         MaxMovementRate,
 		QueueSize:       len(m.movementQueue),

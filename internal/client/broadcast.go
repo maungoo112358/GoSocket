@@ -1,8 +1,9 @@
-package main
+package client
 
 import (
 	"fmt"
 	"gosocket/gamepacket"
+	"gosocket/internal/utils"
 	"math/rand"
 	"net"
 	"sync"
@@ -11,11 +12,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// BroadcastToAll sends a packet to all active clients except the excluded one
 func BroadcastToAll(conn net.PacketConn, packet *gamepacket.GamePacket, excludePrivateID string) {
-	data, err := proto.Marshal(packet)
+	data, err := marshalPacket(packet, "broadcast")
 	if err != nil {
-		fmt.Printf("❌ Failed to marshal broadcast packet: %v\n", err)
 		return
 	}
 
@@ -27,12 +26,9 @@ func BroadcastToAll(conn net.PacketConn, packet *gamepacket.GamePacket, excludeP
 	sendConcurrently(conn, data, targets, nil)
 }
 
-// BroadcastToAllExcept sends a packet to all clients except the one with given clientID
-// This is used for movement packets where clientID is the public ID
 func BroadcastToAllExcept(conn net.PacketConn, packet *gamepacket.GamePacket, excludeClientID string, isLog *bool) {
-	data, err := proto.Marshal(packet)
+	data, err := marshalPacket(packet, "movement")
 	if err != nil {
-		fmt.Printf("❌ Failed to marshal movement packet: %v\n", err)
 		return
 	}
 
@@ -44,41 +40,23 @@ func BroadcastToAllExcept(conn net.PacketConn, packet *gamepacket.GamePacket, ex
 	sendConcurrently(conn, data, targets, isLog)
 }
 
-// SendToClient sends a packet to a specific client
-func SendToClient(conn net.PacketConn, packet *gamepacket.GamePacket, client *ClientInfo) error {
-	data, err := proto.Marshal(packet)
+func SendToClient(conn net.PacketConn, packet *gamepacket.GamePacket, clientInfo *ClientInfo) error {
+	data, err := marshalPacket(packet, "client")
 	if err != nil {
-		return fmt.Errorf("failed to marshal packet: %w", err)
+		return err
 	}
 
-	_, err = conn.WriteTo(data, client.Address)
+	_, err = conn.WriteTo(data, clientInfo.Address)
 	if err != nil {
-		return fmt.Errorf("failed to send to %s: %w", client.PublicID, err)
-	}
-
-	return nil
-}
-
-// SendToAddress sends a packet to a specific network address
-func SendToAddress(conn net.PacketConn, packet *gamepacket.GamePacket, addr net.Addr) error {
-	data, err := proto.Marshal(packet)
-	if err != nil {
-		return fmt.Errorf("failed to marshal packet: %w", err)
-	}
-
-	_, err = conn.WriteTo(data, addr)
-	if err != nil {
-		return fmt.Errorf("failed to send to %s: %w", addr.String(), err)
+		return fmt.Errorf("failed to send to %s: %w", clientInfo.PublicID, err)
 	}
 
 	return nil
 }
 
-// BroadcastToLobbyClients sends a packet only to clients currently in the lobby
 func BroadcastToLobbyClients(conn net.PacketConn, packet *gamepacket.GamePacket, excludePrivateID string) {
-	data, err := proto.Marshal(packet)
+	data, err := marshalPacket(packet, "lobby broadcast")
 	if err != nil {
-		fmt.Printf("❌ Failed to marshal lobby broadcast packet: %v\n", err)
 		return
 	}
 
@@ -91,87 +69,100 @@ func BroadcastToLobbyClients(conn net.PacketConn, packet *gamepacket.GamePacket,
 	fmt.Printf("📡 Lobby broadcast sent to %d clients\n", len(targets))
 }
 
+func BroadcastPlayerLeft(conn net.PacketConn, client *ClientInfo) {
+	leavePacket := &gamepacket.GamePacket{
+		Seq: uint32(rand.Intn(10000)),
+		ServerStatus: &gamepacket.ServerStatus{
+			Message:  fmt.Sprintf("Player %s left the lobby", client.PublicID),
+			ClientId: client.PublicID,
+		},
+	}
+
+	BroadcastToAll(conn, leavePacket, client.PrivateID)
+	fmt.Printf("📤 Broadcast: %s left the lobby\n", client.PublicID)
+}
+
 // === Helper Functions ===
 
-// getTargetClients returns all clients except the excluded private ID
 func getTargetClients(excludePrivateID string) []*ClientInfo {
 	allClients := GetAllClients()
 
 	targets := make([]*ClientInfo, 0, len(allClients))
-	for _, client := range allClients {
-		if client.PrivateID != excludePrivateID {
-			targets = append(targets, client)
+	for _, c := range allClients {
+		if c.PrivateID != excludePrivateID {
+			targets = append(targets, c)
 		}
 	}
 
 	return targets
 }
 
-// getTargetClientsByPublicID returns all clients except the excluded public ID
 func getTargetClientsByPublicID(excludePublicID string) []*ClientInfo {
 	allClients := GetAllClients()
 
 	targets := make([]*ClientInfo, 0, len(allClients))
-	for _, client := range allClients {
-		if client.PublicID != excludePublicID {
-			targets = append(targets, client)
+	for _, c := range allClients {
+		if c.PublicID != excludePublicID {
+			targets = append(targets, c)
 		}
 	}
 
 	return targets
 }
 
-// getLobbyTargetClients returns all clients in lobby except the excluded private ID
 func getLobbyTargetClients(excludePrivateID string) []*ClientInfo {
 	allClients := GetAllClients()
 
 	targets := make([]*ClientInfo, 0)
-	for _, client := range allClients {
-		if client.PrivateID != excludePrivateID && client.InLobby && client.ColorHex != "" {
-			targets = append(targets, client)
+	for _, c := range allClients {
+		if c.PrivateID != excludePrivateID && c.InLobby && c.ColorHex != "" {
+			targets = append(targets, c)
 		}
 	}
 
 	return targets
 }
 
-// sendConcurrently sends data to multiple clients using goroutines
 func sendConcurrently(conn net.PacketConn, data []byte, targets []*ClientInfo, isLog *bool) {
 	var wg sync.WaitGroup
 	sentCount := int32(0)
 
-	for _, client := range targets {
+	for _, c := range targets {
 		wg.Add(1)
-		go func(c *ClientInfo) {
+		go func(cl *ClientInfo) {
 			defer wg.Done()
 
-			if _, err := conn.WriteTo(data, c.Address); err == nil {
+			if _, err := conn.WriteTo(data, cl.Address); err == nil {
 				atomic.AddInt32(&sentCount, 1)
 			} else {
-				fmt.Printf("⚠️ Failed to send to %s (%s): %v\n", c.PublicID, c.Address, err)
+				fmt.Printf("⚠️ Failed to send to %s (%s): %v\n", cl.PublicID, cl.Address, err)
 			}
-		}(client)
+		}(c)
 	}
 
 	wg.Wait()
-	shouldLog := true
-	if isLog != nil {
-		shouldLog = *isLog
-	}
-	if shouldLog {
+	
+	if isLog == nil || *isLog {
 		if len(targets) > 0 {
 			fmt.Printf("📡 Broadcast sent to %d/%d clients\n", sentCount, len(targets))
-
 		}
 	}
 }
 
+func marshalPacket(packet *gamepacket.GamePacket, context string) ([]byte, error) {
+	data, err := proto.Marshal(packet)
+	if err != nil {
+		fmt.Printf("❌ Failed to marshal %s packet: %v\n", context, err)
+		return nil, err
+	}
+	return data, nil
+}
+
 // === Utility Functions for Specific Broadcasts ===
 
-// BroadcastServerMessage sends a server status message to all clients
 func BroadcastServerMessage(conn net.PacketConn, message string) {
 	packet := &gamepacket.GamePacket{
-		Seq: generateRandomSeq(),
+		Seq: utils.GenerateRandomSeq(),
 		ServerStatus: &gamepacket.ServerStatus{
 			Message: message,
 		},
@@ -181,10 +172,9 @@ func BroadcastServerMessage(conn net.PacketConn, message string) {
 	fmt.Printf("📢 Server message broadcast: %s\n", message)
 }
 
-// BroadcastPlayerJoined notifies all clients when a player joins the lobby
 func BroadcastPlayerJoined(conn net.PacketConn, joinedClient *ClientInfo, lobbyJoinData *gamepacket.LobbyJoinBroadcast) {
 	packet := &gamepacket.GamePacket{
-		Seq: generateRandomSeq(),
+		Seq: utils.GenerateRandomSeq(),
 		LobbyJoinBroadcast: &gamepacket.LobbyJoinBroadcast{
 			PublicId:      lobbyJoinData.PublicId,
 			Colorhex:      lobbyJoinData.Colorhex,
@@ -195,9 +185,4 @@ func BroadcastPlayerJoined(conn net.PacketConn, joinedClient *ClientInfo, lobbyJ
 
 	BroadcastToAll(conn, packet, joinedClient.PrivateID)
 	fmt.Printf("📡 Player join broadcast: %s\n", joinedClient.PublicID)
-}
-
-// generateRandomSeq creates a random sequence number for packets
-func generateRandomSeq() uint32 {
-	return uint32(rand.Intn(100000))
 }
