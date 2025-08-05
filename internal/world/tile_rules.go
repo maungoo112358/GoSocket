@@ -1,5 +1,32 @@
 package world
 
+type TileType int
+
+const (
+	NONE         TileType = iota
+	ROAD_LANE_NS          
+	ROAD_LANE_EW          
+	CROSS_INTERSECTION_2_WAYS
+	CROSS_INTERSECTION_3_WAYS
+	CROSS_INTERSECTION_4_WAYS
+	GRASS
+)
+
+type Direction int
+
+const (
+	NORTH Direction = iota
+	SOUTH
+	EAST
+	WEST
+)
+
+type TileInfo struct {
+	TileType    TileType
+	LogicalSize int
+	Connections map[Direction]bool
+}
+
 func initializeTileProperties() map[TileType]TileInfo {
 	tileProperties := make(map[TileType]TileInfo)
 

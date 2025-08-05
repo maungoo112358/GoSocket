@@ -8,35 +8,6 @@ import (
 	"net"
 )
 
-type TileType int
-
-const (
-	NONE         TileType = iota
-	ROAD_LANE_NS          // North-South road
-	ROAD_LANE_EW          // East-West road
-	CROSS_INTERSECTION_2_WAYS
-	CROSS_INTERSECTION_3_WAYS
-	CROSS_INTERSECTION_4_WAYS
-	GRASS
-)
-
-// For adjacency checking
-type Direction int
-
-const (
-	NORTH Direction = iota
-	SOUTH
-	EAST
-	WEST
-)
-
-// Tile properties for WFC logic
-type TileInfo struct {
-	TileType    TileType
-	LogicalSize int                // 1 for grass, 2 for roads/intersections
-	Connections map[Direction]bool // which sides can connect
-}
-
 type WFCCell struct {
 	Possibilities map[TileType]bool
 	IsCollapsed   bool
