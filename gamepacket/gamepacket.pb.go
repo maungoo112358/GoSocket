@@ -24,10 +24,10 @@ const (
 type TileType int32
 
 const (
-	TileType_None          TileType = 0
-	TileType_ROAD_LANE     TileType = 1
-	TileType_CROSS_SECTION TileType = 2
-	TileType_GRASS         TileType = 3
+	TileType_None               TileType = 0
+	TileType_ROAD_LANE          TileType = 1
+	TileType_CROSS_INTERSECTION TileType = 2
+	TileType_GRASS              TileType = 3
 )
 
 // Enum value maps for TileType.
@@ -35,14 +35,14 @@ var (
 	TileType_name = map[int32]string{
 		0: "None",
 		1: "ROAD_LANE",
-		2: "CROSS_SECTION",
+		2: "CROSS_INTERSECTION",
 		3: "GRASS",
 	}
 	TileType_value = map[string]int32{
-		"None":          0,
-		"ROAD_LANE":     1,
-		"CROSS_SECTION": 2,
-		"GRASS":         3,
+		"None":               0,
+		"ROAD_LANE":          1,
+		"CROSS_INTERSECTION": 2,
+		"GRASS":              3,
 	}
 )
 
@@ -1202,11 +1202,11 @@ const file_gamepacket_proto_rawDesc = "" +
 	"\bVector_3\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x02R\x01x\x12\f\n" +
 	"\x01y\x18\x02 \x01(\x02R\x01y\x12\f\n" +
-	"\x01z\x18\x03 \x01(\x02R\x01z*A\n" +
+	"\x01z\x18\x03 \x01(\x02R\x01z*F\n" +
 	"\bTileType\x12\b\n" +
 	"\x04None\x10\x00\x12\r\n" +
-	"\tROAD_LANE\x10\x01\x12\x11\n" +
-	"\rCROSS_SECTION\x10\x02\x12\t\n" +
+	"\tROAD_LANE\x10\x01\x12\x16\n" +
+	"\x12CROSS_INTERSECTION\x10\x02\x12\t\n" +
 	"\x05GRASS\x10\x03B\x15Z\x13gosocket/gamepacketb\x06proto3"
 
 var (
